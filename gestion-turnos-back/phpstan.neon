@@ -1,0 +1,36 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    # Se analiza el código que se despliega. Los tests quedan fuera porque
+    # PHPStan no puede tipar $this dentro de las closures de Pest: lo resuelve
+    # como TestCall en vez del TestCase, y reporta cientos de falsos positivos.
+    # La corrección de los tests la dan Pest y Pint.
+    paths:
+        - app
+        - database
+        - routes
+
+    # Nivel 5: detecta tipos incompatibles, métodos inexistentes y accesos a
+    # propiedades que no existen. Punto de partida realista sobre código ya
+    # escrito; la meta es subirlo gradualmente.
+    level: 5
+
+    checkModelProperties: true
+
+    ignoreErrors:
+        # Los seeders usan $this->command, que es nullable por diseño.
+        - identifier: nullsafe.neverNull
+
+        # El seeder de datos de prueba arma los atributos dinámicamente; larastan
+        # exige que las claves sean literales de propiedades del modelo, cosa que
+        # no aplica a un array construido con array_merge.
+        -
+            identifier: argument.type
+            path: database/seeders/DemoDataSeeder.php
+
+        # Firma que trae el esqueleto de Laravel; larastan pide un tipo más
+        # estrecho del que permite escribir la sintaxis de PHPDoc.
+        -
+            identifier: method.childReturnType
+            path: database/factories/UserFactory.php

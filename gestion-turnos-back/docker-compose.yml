@@ -1,0 +1,119 @@
+# Los secretos viven en .env (ignorado por git), nunca en este archivo.
+# Laravel lee ese .env por sí solo desde el volumen montado, así que NO se usa
+# `env_file:`: inyectarlo como variables del contenedor pisaría la configuración
+# de phpunit.xml y los tests correrían contra la base de desarrollo.
+# El servicio mysql sí necesita las credenciales, y las toma por sustitución
+# ${VAR}, que Compose resuelve leyendo el mismo .env.
+#
+# En `environment:` quedan solo los overrides de red interna de Docker:
+# dentro de la red los servicios se resuelven por nombre, no por localhost.
+services:
+  app:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gestion-turnos-app
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      # vendor/ vive en un volumen de Docker (filesystem Linux) en vez del bind
+      # mount de Windows, que es ~26x más lento por archivo. Laravel lee miles
+      # de archivos de vendor por request: con el bind mount cada request tarda
+      # segundos. Se autopobla desde la imagen la primera vez.
+      # Si cambiás composer.json: docker compose exec app composer install
+      - vendor-data:/var/www/html/vendor
+      - ./docker/php/opcache.ini:/usr/local/etc/php/conf.d/zz-opcache.ini:ro
+    environment:
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+      - REVERB_HOST=reverb
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - gestion-net
+
+  nginx:
+    restart: unless-stopped
+    image: nginx:stable-alpine
+    container_name: gestion-turnos-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - gestion-net
+
+  mysql:
+    image: mysql:8.1
+    container_name: gestion-turnos-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      # Solo 127.0.0.1: accesible desde esta PC (Workbench, DBeaver) pero NO
+      # desde la red. Con "3306:3306" quedaba expuesto a toda la red local.
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - gestion-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: gestion-turnos-redis
+    restart: unless-stopped
+    # Redis sin contraseña acepta a cualquiera que llegue al puerto, y guarda
+    # la caché de sesiones y permisos. Con --requirepass exige autenticación.
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - gestion-net
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gestion-turnos-reverb
+    # Si Reverb se cae, el backend no resuelve el host `reverb` y los
+    # llamados devuelven 500. Que se reinicie solo.
+    restart: unless-stopped
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - "8080:8080"
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - vendor-data:/var/www/html/vendor
+      - ./docker/php/opcache.ini:/usr/local/etc/php/conf.d/zz-opcache.ini:ro
+    environment:
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+      # OJO: acá NO va REVERB_HOST. En config/reverb.php esa variable define el
+      # `hostname` del servidor, y si no coincide con el Host con el que se
+      # conecta el navegador (localhost), Reverb acepta la suscripción pero
+      # nunca entrega los eventos. El servidor toma `localhost` desde el .env.
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - gestion-net
+
+volumes:
+  mysql-data:
+  redis-data:
+  vendor-data:
+
+networks:
+  gestion-net:
+    driver: bridge
