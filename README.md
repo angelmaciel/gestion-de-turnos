@@ -125,8 +125,6 @@ bash docker/backup.sh          # dump comprimido, rotación a 30 días
 
 ## Antes de producción
 
-Ver la lista completa en [SEGURIDAD.md](SEGURIDAD.md). Lo mínimo:
-
 - `APP_DEBUG=false` y `APP_ENV=production`
 - HTTPS con certificado válido
 - Rotar todos los secretos y borrar los usuarios de ejemplo

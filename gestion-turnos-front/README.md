@@ -1,16 +1,44 @@
-# React + Vite
+# Frontend — Gestión de Turnos
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SPA en **React 19 + Vite 8 + Tailwind CSS 4**. La documentación general y la
+puesta en marcha están en el [README principal](../README.md).
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build
+npm run lint
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Vite hace de proxy hacia el backend: `/api` y `/sanctum` van a `http://localhost`
+(nginx). Dentro de Docker hay que apuntar al servicio por su nombre con
+`VITE_PROXY_TARGET=http://nginx`.
 
-## React Compiler
+## Organización
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Ruta | Contenido |
+|---|---|
+| `src/pages/` | Una pantalla por rol: Login, Reception, Triage, DoctorPanel, WaitingRoom. |
+| `src/components/ui/` | Primitivas de interfaz (Button, Card, Field, Input, Badge…). Viven en el repo, no en una dependencia. |
+| `src/context/` | Estado de sesión. Consulta `/auth/me`; no guarda nada en el navegador. |
+| `src/hooks/` | `useColaEnVivo`: recarga la pantalla cuando el backend avisa que cambió una cola. |
+| `src/api/axios.jsx` | Cliente HTTP con cookies y token CSRF. |
+| `src/services/echo.js` | Cliente de WebSocket (Reverb). |
+| `src/index.css` | Tokens de diseño con `@theme` de Tailwind. |
 
-## Expanding the ESLint configuration
+## Cosas a tener en cuenta
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+**No se usa `localStorage` para la sesión.** La autenticación va en una cookie
+`HttpOnly` que JavaScript no puede leer, y los datos del usuario se piden a
+`/auth/me` en cada carga. Guardar el usuario en el navegador lo dejaría legible
+por cualquier script y desactualizado respecto del backend.
+
+**Las respuestas de la API vienen envueltas en `data`.** Son API Resources de
+Laravel: una colección llega como `{ data: [...] }`, no como un array suelto.
+
+**El `id` de un turno es un ULID**, no un número. El valor que se muestra al
+paciente es `turno`, el correlativo del día.
+
+**La pantalla `/tv` es solo de visualización**, sin controles. Lo único manual es
+un clic inicial para habilitar el audio: los navegadores bloquean la reproducción
+hasta que hay una interacción del usuario, y no se puede evitar por código.
