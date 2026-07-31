@@ -1,0 +1,22 @@
+# Secretos y entornos locales: nunca se versionan.
+.env
+.env.*
+!.env.example
+
+# Copia local de seguridad: contiene los .env reales con claves y contraseñas,
+# y un bundle del repositorio. No debe salir de esta máquina.
+/_backup-local
+
+# Dependencias
+node_modules/
+vendor/
+
+# Build
+dist/
+build/
+
+# Editores y SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
