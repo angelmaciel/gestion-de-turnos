@@ -1,109 +1,75 @@
-# Seguridad — Gestión de Turnos
+# Notas de seguridad
 
-Este sistema maneja **datos de salud**: la categoría de dato personal con mayor
-nivel de protección exigido. Este documento registra qué protecciones están
-implementadas y qué falta hacer antes de exponerlo fuera de una PC de desarrollo.
+Cómo funcionan las protecciones del sistema. Está acá porque varias no son
+evidentes leyendo el código, y modificarlas sin entenderlas rompe cosas de forma
+silenciosa.
 
----
+## Dónde vive cada cosa
 
-## ✅ Implementado
-
-| Protección | Dónde |
+| Protección | Archivo |
 |---|---|
-| Límite de intentos de login (5/min por email+IP, 20/min por IP) | `AppServiceProvider::configurarLimitesDePeticiones()` |
-| Límite general de la API (120/min) y de la pantalla pública (30/min) | mismo archivo + `routes/api.php` |
-| Expiración de tokens a las 8 h | `config/sanctum.php` → `SANCTUM_EXPIRATION` |
-| Registro de auditoría de accesos a datos clínicos | tabla `audit_logs`, modelo `AuditLog` |
-| CORS restringido al origen del frontend | `config/cors.php` ← `FRONTEND_URL` |
-| Cabeceras de seguridad (anti-clickjacking, nosniff, no-store) | `nginx/default.conf` |
-| Bloqueo web de `.env`, logs, `vendor/`, `composer.json` | `nginx/default.conf` |
-| Política de contraseñas (12+, mayús/minús, números, símbolos) | `AppServiceProvider::configurarPoliticaDeContrasenas()` |
-| MySQL y Redis solo accesibles desde `127.0.0.1` | `docker-compose.yml` |
-| Redis con contraseña obligatoria | `docker-compose.yml` → `REDIS_PASSWORD` |
-| Seeders de usuarios bloqueados en producción | `UserSeeder`, `ProfessionalSeeder` |
-| Canal público sin datos sensibles (sin cédula, especialidad ni datos clínicos) | `PacienteLlamado`, `PublicScreenController` |
-| Backups con rotación a 30 días | `docker/backup.sh` |
-| Aislamiento por especialidad entre profesionales | `ProfessionalController` |
-| **Cifrado en reposo de datos clínicos** (peso, altura, presión) | casts `encrypted` en `Appointment` |
-| **Cifrado en reposo de la cédula** + índice ciego para buscarla | `Patient` |
+| Límite de intentos de login y de la API | `app/Providers/AppServiceProvider.php` |
+| Expiración de sesión | `config/sanctum.php` |
+| Auditoría de accesos a datos clínicos | `app/Models/AuditLog.php` |
+| Autorización por pertenencia | `app/Policies/` |
+| Recorte de campos por rol | `app/Http/Resources/` |
+| Cifrado en reposo e índice ciego | `app/Models/Patient.php`, `Appointment.php` |
+| Bloqueos de concurrencia | `app/Services/` |
+| Orígenes permitidos | `config/cors.php` |
+| Cabeceras y bloqueo de archivos | `nginx/default.conf` |
 
-Cubierto por tests en `tests/Feature/AppointmentFlowTest.php`, incluidos dos que
-fallan si alguien vuelve a filtrar datos sensibles al canal público.
+## Lo que conviene entender antes de tocar
 
----
+**La cédula está cifrada y no admite `WHERE`.** El cifrado de Laravel usa un IV
+aleatorio: el mismo texto produce cifrados distintos cada vez. Por eso existe
+`cedula_hash`, un HMAC determinista que permite buscar y garantizar unicidad sin
+guardar el número en claro. Buscar con `where('cedula', ...)` **no va a fallar,
+simplemente no va a encontrar nada**. Se usa el scope `Patient::conCedula()`.
 
-## ⛔ Obligatorio antes de salir a producción
+**Los datos clínicos también están cifrados.** Se pudo hacer sin costo porque
+ninguna consulta filtra ni ordena por peso, altura o presión. Si en el futuro
+hace falta un reporte que agrupe por esos campos, hay que resolverlo con una
+columna derivada, no quitando el cifrado.
 
-- [ ] **`APP_DEBUG=false`** en el `.env` del servidor.
-      Con `true`, cualquier error muestra el stack trace con las credenciales de la base.
-- [ ] **`APP_ENV=production`**.
-      Activa el forzado de HTTPS y bloquea los seeders de usuarios demo.
-- [ ] **HTTPS con certificado válido** (Let's Encrypt es gratuito).
-      Sin esto, contraseñas, tokens y nombres de pacientes viajan en texto plano.
-- [ ] **Rotar todos los secretos**: `APP_KEY`, `DB_PASSWORD`, `MYSQL_ROOT_PASSWORD`,
-      `REDIS_PASSWORD`, `REVERB_APP_SECRET` y la API key de Gemini.
-- [ ] **Borrar los usuarios demo** (`*@example.com`) y crear cuentas reales
-      con contraseñas que cumplan la política.
-- [ ] **Programar el backup**: `0 2 * * * cd /ruta && bash docker/backup.sh`
-      y verificar una restauración real. Un backup no probado no es un backup.
-- [ ] **Guardar los backups fuera del servidor** (cifrados: contienen datos clínicos).
+**La pantalla de sala es pública.** Su endpoint y su canal de WebSocket no
+requieren autenticación. `PublicCallResource` y `PacienteLlamado` recortan los
+campos a propósito: no viaja la especialidad, porque permitiría inferir la
+condición médica del paciente frente a toda la sala. Hay tests que fallan si
+alguien agrega un campo de más.
 
----
+**Las rutas resuelven por ULID.** El id autoincremental nunca se expone. Si se
+agrega un endpoint nuevo, el modelo ya define `getRouteKeyName()`, pero una
+consulta manual con `find($id)` sobre un valor que viene de la URL no va a
+funcionar: hay que buscar por `ulid`.
 
-## ⚠️ Riesgos aceptados conscientemente
+**La sesión va en cookie `HttpOnly` con CSRF.** El grupo `api` incluye
+`EnsureFrontendRequestsAreStateful`. **No** hay que excluir `api/*` de la
+validación CSRF: con autenticación por cookie el navegador la adjunta solo, y sin
+token cualquier sitio podría disparar peticiones en nombre del usuario.
 
-**La pantalla `/tv` es pública y muestra nombres de pacientes.**
-Es una decisión de producto: el paciente tiene que reconocerse cuando lo llaman.
-Está mitigado — sin cédula, sin especialidad (que dejaría inferir la condición
-médica), sin datos clínicos, y con límite de 30 peticiones/minuto. Si hiciera
-falta endurecerlo: mostrar iniciales, restringir por IP, o exigir un token fijo
-para la TV.
+**Llamar un turno y asignar el número del día usan `Cache::lock`.** Son los dos
+puntos donde dos personas compiten por el mismo recurso. Los respaldan índices
+únicos en la base, por si el lock expira o el sistema corre en varios nodos.
 
-**El token se guarda en `localStorage`.**
-Vulnerable a XSS: un script inyectado puede leerlo. Lo robusto son cookies
-`httpOnly`, que JavaScript no puede leer. Requiere rehacer el flujo de
-autenticación completo.
+## La APP_KEY es irremplazable
 
-**El nombre del paciente sigue sin cifrar.**
-Es deliberado: se muestra en la TV pública de todos modos, y mantenerlo en claro
-permite la búsqueda parcial por nombre, que es lo que hace útil al buscador de
-Preconsulta. Cifrarlo agregaría poco y rompería esa función.
+Con el cifrado en reposo activo, la `APP_KEY` es la única llave que descifra los
+datos clínicos y las cédulas. Si se pierde o se regenera:
 
-**La búsqueda por cédula requiere el número completo.**
-Es el costo aceptado del cifrado: el índice ciego solo resuelve coincidencias
-exactas. La cédula se normaliza (`30.125.478` y `30125478` son equivalentes), y
-para búsquedas parciales está el nombre.
-
----
-
-## 🔑 La APP_KEY es ahora irremplazable
-
-Con el cifrado en reposo activo, **la `APP_KEY` es la única llave que descifra
-los datos clínicos y las cédulas**. Si se pierde o se cambia:
-
-- Todos los datos cifrados quedan **irrecuperables para siempre**.
+- Los datos cifrados quedan **irrecuperables**.
 - Los `cedula_hash` dejan de coincidir: los pacientes existentes se vuelven
   imposibles de encontrar y se duplicarían al registrarlos de nuevo.
 
-Por lo tanto:
+Por lo tanto: **nunca** correr `php artisan key:generate` sobre una instalación
+con datos, y guardar la llave junto con los backups. Un dump de la base **sin la
+`APP_KEY` es un archivo inútil**.
 
-- [ ] Guardar la `APP_KEY` en un gestor de secretos, **fuera del servidor**.
-- [ ] **Nunca** correr `php artisan key:generate` sobre una instalación con datos.
-- [ ] Incluir la `APP_KEY` en el procedimiento de restauración: un backup de la
-      base **sin la llave es un archivo inútil**.
+## Verificación
 
----
+Los tests cubren la autorización (un usuario ajeno recibe 403), el recorte del
+canal público, el cifrado en reposo y la numeración de turnos.
 
-## Código fuente
-
-El **frontend no se puede proteger**: todo lo que llega al navegador es
-inspeccionable. La minificación de Vite dificulta la lectura, pero la ofuscación
-aporta poco frente al costo de debugging. La regla que ya se sigue: **ninguna
-clave, lógica de negocio ni regla de autorización vive en el frontend**.
-
-El **backend PHP nunca se envía al cliente**. Sus riesgos reales — `.env`
-accesible por web, secretos en el historial de Git, listado de directorios,
-versión del servidor expuesta — están todos cerrados.
-
-Proteger el sistema frente a que alguien lo copie es un asunto de licencia y
-contrato, no técnico.
+```bash
+docker compose exec app php artisan test
+docker compose exec app ./vendor/bin/phpstan analyse
+```
