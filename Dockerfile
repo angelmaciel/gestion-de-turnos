@@ -36,7 +36,17 @@ RUN apt-get update \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     # Sin esto, PHP-FPM descarta las variables de entorno que Render inyecta
     # (PUSHER_APP_SECRET, etc.) y solo las ve la CLI, nunca las peticiones web.
-    && echo "clear_env = no" >> /usr/local/etc/php-fpm.d/www.conf
+    && echo "clear_env = no" >> /usr/local/etc/php-fpm.d/www.conf \
+    # La imagen oficial trae docker.conf con "listen = 9000" (todas las
+    # interfaces) para poder linkear contenedores por red. Acá nginx y
+    # PHP-FPM viven en el mismo contenedor: dejarlo abierto a 0.0.0.0 solo
+    # suma un puerto extra que confunde la auto-detección de puerto de
+    # Render (tardó 5 minutos en decidir a cuál rutear, mientras tanto
+    # devolvía 404 a todo).
+    && sed -i 's/^listen = 9000$/listen = 127.0.0.1:9000/' /usr/local/etc/php-fpm.d/docker.conf \
+    # Mismo motivo: el sitio default de nginx escucha en el puerto 80 y
+    # nunca se lo pisa el template propio (que escucha en $PORT).
+    && rm -f /etc/nginx/sites-enabled/default
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
