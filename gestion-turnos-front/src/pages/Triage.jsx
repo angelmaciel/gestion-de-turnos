@@ -47,7 +47,9 @@ export function Triage() {
   };
 
   useEffect(() => {
-    cargarPendientes();
+    (async () => {
+      await cargarPendientes();
+    })();
   }, []);
 
   // Aparece solo el paciente que Recepción acaba de registrar.

@@ -4,6 +4,47 @@ Gestión de turnos para un centro de salud: registro de pacientes, preconsulta,
 llamado desde el consultorio y anuncio en la pantalla de la sala de espera, con
 actualización en tiempo real y aviso por voz.
 
+## Capturas
+
+<table>
+<tr>
+<td width="50%">
+
+**Recepción** — registra al paciente y emite el turno.
+<img src="docs/screenshots/04-recepcion.jpg" alt="Pantalla de Recepción">
+</td>
+<td width="50%">
+
+**Preconsulta** — busca al paciente y carga sus signos vitales.
+<img src="docs/screenshots/05-preconsulta.jpg" alt="Pantalla de Preconsulta">
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Consultorio** — cola del profesional y llamado al paciente.
+<img src="docs/screenshots/06-consultorio.jpg" alt="Pantalla de Consultorio">
+</td>
+<td width="50%">
+
+**Pantalla de sala** — se actualiza sola por WebSocket y anuncia por voz.
+<img src="docs/screenshots/07-pantalla-sala.jpg" alt="Pantalla de sala de espera">
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Torre de Control** (admin) — estado en vivo de las 6 salas, cuello de botella de un vistazo.
+<img src="docs/screenshots/03-torre-control.jpg" alt="Torre de Control del admin">
+</td>
+<td width="50%">
+
+**Ingreso** — sesión por cookie HttpOnly, sin tokens en el cliente.
+<img src="docs/screenshots/01-login.jpg" alt="Pantalla de login">
+</td>
+</tr>
+</table>
+
 ## Flujo
 
 ```
@@ -30,6 +71,43 @@ Cada pantalla se actualiza sola por WebSocket: no hay que recargar.
 | Frontend | React 19 · Vite 8 · Tailwind CSS 4 |
 | Infraestructura | Docker Compose · nginx |
 | Calidad | Pest · PHPStan (larastan) · Pint · ESLint |
+
+## Arquitectura
+
+```mermaid
+flowchart TB
+    subgraph cliente["Cliente (navegador)"]
+        SPA["React SPA"]
+    end
+
+    subgraph frontend["Frontend — npm run dev"]
+        VITE["Vite dev server :5173\nproxy /api y /sanctum"]
+    end
+
+    subgraph backend["Backend — docker compose"]
+        NGINX["nginx :80"]
+        APP["Laravel API (PHP-FPM)"]
+        REVERB["Reverb :8080\nWebSocket"]
+        SCHED["scheduler\nphp artisan schedule:work"]
+        MYSQL[("MySQL")]
+        REDIS[("Redis\ncache · sesiones · locks")]
+    end
+
+    SPA -- "HTTP/JSON" --> VITE
+    SPA -- "WebSocket, directo" --> REVERB
+    VITE -- proxy --> NGINX
+    NGINX -- "fastcgi :9000" --> APP
+    APP -- "broadcast(evento)" --> REVERB
+    APP --- MYSQL
+    APP --- REDIS
+    SCHED -- "control-tower:snapshot-stats\n(diario 00:10)" --> MYSQL
+```
+
+El navegador habla con el backend por dos canales separados: peticiones HTTP normales
+(vía el proxy de Vite en desarrollo, o directo a nginx en producción) y una conexión
+WebSocket aparte contra Reverb, que es donde llegan los eventos en tiempo real
+(`cola.actualizada`, `paciente.llamado`). nginx nunca ve el tráfico de WebSocket: el
+navegador se conecta a Reverb directo por su propio puerto.
 
 ## Puesta en marcha
 
