@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/authContextValue';
 import { Alert, Button, Card, CardBody, Field, Input } from '../components/ui';
+import fondoGestion from '../assets/fondoGestion.jpg';
 
 // Cada rol entra directo a su pantalla de trabajo.
 const DESTINO_POR_ROL = {
@@ -52,49 +53,54 @@ export function Login() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6 py-12">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-lg font-semibold">Gestión de Turnos</h1>
-          <p className="mt-1 text-sm text-muted">Ingresá con tu cuenta</p>
+    <div
+      className="min-h-screen bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${fondoGestion})` }}
+    >
+      <main className="flex min-h-screen items-center justify-center bg-canvas/50 px-6 py-12">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 text-center">
+            <h1 className="text-lg font-semibold">Gestión de Turnos</h1>
+            <p className="mt-1 text-sm text-muted">Ingresá con tu cuenta</p>
+          </div>
+
+          <Card>
+            <CardBody>
+              <form onSubmit={handleLogin} className="space-y-4">
+                {error && <Alert tone="critical">{error}</Alert>}
+
+                <Field label="Correo electrónico" htmlFor="email">
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="nombre@ejemplo.com"
+                  />
+                </Field>
+
+                <Field label="Contraseña" htmlFor="password">
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    placeholder="••••••••"
+                  />
+                </Field>
+
+                <Button type="submit" disabled={loading} className="w-full" size="lg">
+                  {loading ? 'Ingresando' : 'Ingresar'}
+                </Button>
+              </form>
+            </CardBody>
+          </Card>
         </div>
-
-        <Card>
-          <CardBody>
-            <form onSubmit={handleLogin} className="space-y-4">
-              {error && <Alert tone="critical">{error}</Alert>}
-
-              <Field label="Correo electrónico" htmlFor="email">
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="nombre@ejemplo.com"
-                />
-              </Field>
-
-              <Field label="Contraseña" htmlFor="password">
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                />
-              </Field>
-
-              <Button type="submit" disabled={loading} className="w-full" size="lg">
-                {loading ? 'Ingresando' : 'Ingresar'}
-              </Button>
-            </form>
-          </CardBody>
-        </Card>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
