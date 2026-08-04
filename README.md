@@ -180,6 +180,36 @@ Detalle completo de las protecciones en [SEGURIDAD.md](SEGURIDAD.md).
 
 ## Verificación
 
+44 tests (Pest) sobre lo que realmente puede fallar en un sistema con datos de
+salud, no sobre getters y setters:
+
+- **Autorización cruzada** — un profesional de otra especialidad no ve ni
+  puede tocar un turno ajeno; un colega no puede operar un turno que ya tomó
+  otro; ninguna acción de escritura funciona sin el rol correcto
+  (`impide que un profesional de otra especialidad vea el turno en su cola`,
+  `rechaza alternar limpieza sin rol admin`).
+- **Máquina de estados del turno** — no se puede atender ni marcar ausente un
+  turno que no fue llamado, ni completar la misma preconsulta dos veces
+  (`impide atender o marcar ausente un turno que no fue llamado`).
+- **Exposición de datos** — el canal público y el endpoint de la TV nunca
+  filtran cédula, especialidad ni datos clínicos; los turnos se identifican
+  por ULID, nunca por el id autoincremental
+  (`no expone datos sensibles en el evento de broadcast`,
+  `no permite enumerar turnos por el id autoincremental`).
+- **Cifrado en reposo** — cédula y datos clínicos viajan cifrados en la base
+  (`cifra en la base los datos clínicos y la cédula`).
+- **Sesión** — login por cookie sin token filtrable, logout real, intentos
+  fallidos auditados y con freno de fuerza bruta
+  (`no revela si el email existe al fallar el login`,
+  `bloquea la fuerza bruta tras varios intentos fallidos`).
+- **Torre de Control** — cada estado de sala (a tiempo, retraso crítico,
+  limpieza, vacía por inasistencia) se prueba por separado, y la limpieza
+  manual siempre gana sobre el estado calculado
+  (`la limpieza tiene prioridad sobre cualquier otro estado calculado`).
+- **Concurrencia e idempotencia** — el correlativo diario no se duplica ni se
+  mezcla entre días, y recalcular las estadísticas de un día no crea filas
+  repetidas (`no mezcla turnos de otro dia en el conteo`).
+
 ```bash
 cd gestion-turnos-back
 docker compose exec app php artisan test
