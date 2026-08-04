@@ -1,0 +1,49 @@
+server {
+    listen ${PORT};
+    server_name _;
+
+    client_max_body_size 20m;
+    server_tokens off;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;
+
+    location ~ /\.(?!well-known) { deny all; access_log off; log_not_found off; }
+    location ~* \.(env|log|sql|sqlite|bak|ini|yml|yaml|lock|json)$ { deny all; }
+    location ^~ /vendor/ { deny all; }
+    location ^~ /storage/logs/ { deny all; }
+
+    # API, Sanctum y las rutas de salud van a Laravel. No hace falta el
+    # resolver dinámico de docker-compose: acá php-fpm vive en el mismo
+    # contenedor, en localhost.
+    location ~ ^/(api|sanctum|up|health)(/|$) {
+        add_header Cache-Control "no-store" always;
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_script_name;
+        fastcgi_read_timeout 300;
+        fastcgi_send_timeout 300;
+    }
+
+    # Todo lo demás es el SPA: se sirve como archivo estático, y si no existe
+    # (rutas de React Router como /dashboard, /admin/torre-control) cae a
+    # index.html para que el router del cliente decida.
+    root /var/www/frontend-dist;
+    index index.html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
