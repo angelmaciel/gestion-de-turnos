@@ -29,8 +29,16 @@ yarn-error.log
 
 # Los logs de la aplicación registran payloads con nombres y cédulas de
 # pacientes. Las vistas y cachés compiladas son artefactos de ejecución.
-/storage/logs
-/storage/framework/cache
-/storage/framework/sessions
-/storage/framework/views
-/storage/framework/testing
+# Se excluye el CONTENIDO, no la carpeta: si se ignora la carpeta entera
+# (como estaba antes), un clon nuevo no la trae, Blade no tiene dónde
+# compilar vistas y hasta la página de error 404 revienta con 500.
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
