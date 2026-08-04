@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (Pest · Pint · PHPStan)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gestion-turnos-back
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, bcmath, pdo_sqlite, sqlite3, zip
+          ini-values: memory_limit=512M
+          coverage: none
+
+      - name: Cache de dependencias de Composer
+        uses: actions/cache@v4
+        with:
+          path: gestion-turnos-back/vendor
+          key: composer-${{ hashFiles('gestion-turnos-back/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Instalar dependencias
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # Los tests fuerzan su propia config (SQLite en memoria, sin Redis) vía
+      # phpunit.xml; el .env solo hace falta para tener APP_KEY.
+      - name: Preparar entorno de testing
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Pint (estilo de código)
+        run: ./vendor/bin/pint --test
+
+      - name: PHPStan (análisis estático)
+        run: ./vendor/bin/phpstan analyse
+
+      - name: Pest (tests)
+        run: php artisan test
+
+  frontend:
+    name: Frontend (ESLint · build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gestion-turnos-front
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: gestion-turnos-front/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

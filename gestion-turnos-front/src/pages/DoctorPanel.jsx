@@ -37,7 +37,9 @@ export function DoctorPanel() {
   };
 
   useEffect(() => {
-    fetchQueue();
+    (async () => {
+      await fetchQueue();
+    })();
   }, []);
 
   // La cola se refresca sola cuando Preconsulta confirma un paciente

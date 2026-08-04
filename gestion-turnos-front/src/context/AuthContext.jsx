@@ -33,9 +33,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let vigente = true;
 
-    refrescarUsuario().finally(() => {
+    (async () => {
+      await refrescarUsuario();
       if (vigente) setCargando(false);
-    });
+    })();
 
     return () => {
       vigente = false;
