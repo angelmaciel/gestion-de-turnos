@@ -7,6 +7,7 @@ const ENLACES = [
   { to: '/reception', label: 'Recepción', roles: ['mesa de entrada'] },
   { to: '/triage', label: 'Preconsulta', roles: ['preconsulta'] },
   { to: '/doctor', label: 'Consultorio', roles: ['profesional'] },
+  { to: '/admin/torre-control', label: 'Torre de Control', roles: ['admin'] },
 ];
 
 export function Navbar() {

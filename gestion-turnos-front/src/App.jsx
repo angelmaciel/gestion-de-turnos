@@ -7,6 +7,7 @@ import { Reception } from './pages/Reception';
 import { Triage } from './pages/Triage';
 import { DoctorPanel } from './pages/DoctorPanel';
 import { WaitingRoom } from './pages/WaitingRoom';
+import { AdminControlTower } from './pages/AdminControlTower';
 
 /**
  * La sesión se comprueba contra el backend, no leyendo localStorage.
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/reception" element={<ProtectedRoute><Reception /></ProtectedRoute>} />
           <Route path="/triage" element={<ProtectedRoute><Triage /></ProtectedRoute>} />
           <Route path="/doctor" element={<ProtectedRoute><DoctorPanel /></ProtectedRoute>} />
+          <Route path="/admin/torre-control" element={<ProtectedRoute><AdminControlTower /></ProtectedRoute>} />
 
           {/* Ruta por defecto */}
           <Route path="*" element={<Navigate to="/login" replace />} />

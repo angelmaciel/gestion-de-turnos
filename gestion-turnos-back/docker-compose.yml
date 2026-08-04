@@ -109,6 +109,29 @@ services:
     networks:
       - gestion-net
 
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gestion-turnos-scheduler
+    # Solo corre el scheduler de Laravel (routes/console.php); hoy es el
+    # único job registrado, el cierre diario de room_daily_stats.
+    restart: unless-stopped
+    command: php artisan schedule:work
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - vendor-data:/var/www/html/vendor
+      - ./docker/php/opcache.ini:/usr/local/etc/php/conf.d/zz-opcache.ini:ro
+    environment:
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - gestion-net
+
 volumes:
   mysql-data:
   redis-data:

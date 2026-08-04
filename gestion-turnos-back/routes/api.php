@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ControlTowerController;
 use App\Http\Controllers\Api\EntranceController;
 use App\Http\Controllers\Api\PreconsultaController;
 use App\Http\Controllers\Api\ProfessionalController;
@@ -44,5 +45,11 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('turnos/{appointment}/call', [ProfessionalController::class, 'call']);
         Route::post('turnos/{appointment}/attend', [ProfessionalController::class, 'attend']);
         Route::post('turnos/{appointment}/absent', [ProfessionalController::class, 'absent']);
+    });
+
+    // 🗼 Torre de Control: tablero en vivo de las salas, solo para admin.
+    Route::middleware(['role:admin'])->prefix('admin')->group(function () {
+        Route::get('torre-control', [ControlTowerController::class, 'index']);
+        Route::post('salas/{room}/limpieza', [ControlTowerController::class, 'toggleLimpieza']);
     });
 });

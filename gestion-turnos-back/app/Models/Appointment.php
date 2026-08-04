@@ -28,6 +28,7 @@ use Illuminate\Support\Str;
  * @property Carbon|null $preconsulta_at
  * @property Carbon|null $called_at
  * @property Carbon|null $attended_at
+ * @property Carbon|null $absent_at
  * @property Carbon|null $last_called_at
  * @property-read float|null $imc
  * @property-read string|null $imc_categoria
@@ -55,6 +56,7 @@ class Appointment extends Model
         'preconsulta_at',
         'called_at',
         'attended_at',
+        'absent_at',
         'daily_number',
         'daily_date',
     ];
@@ -71,6 +73,7 @@ class Appointment extends Model
         'preconsulta_at' => 'datetime',
         'called_at' => 'datetime',
         'attended_at' => 'datetime',
+        'absent_at' => 'datetime',
         'last_called_at' => 'datetime',
         'daily_date' => 'date',
     ];

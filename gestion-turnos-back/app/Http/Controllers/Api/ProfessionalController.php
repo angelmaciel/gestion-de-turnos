@@ -82,7 +82,7 @@ class ProfessionalController extends Controller
     {
         $this->authorize('absent', $appointment);
 
-        $appointment->update(['status' => AppointmentStatus::AUSENTE]);
+        $appointment->update(['status' => AppointmentStatus::AUSENTE, 'absent_at' => now()]);
 
         AuditLog::registrar('marco_ausente', $appointment, ['intentos' => $appointment->attempts]);
 
