@@ -1,0 +1,4 @@
+# Los scripts que corren dentro de contenedores Linux necesitan LF sí o sí:
+# con CRLF, "#!/bin/sh" se rompe con "bad interpreter" al ejecutarse. No
+# depender de que el autocrlf de cada máquina lo resuelva por las suyas.
+*.sh text eol=lf

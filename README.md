@@ -109,6 +109,16 @@ WebSocket aparte contra Reverb, que es donde llegan los eventos en tiempo real
 (`cola.actualizada`, `paciente.llamado`). nginx nunca ve el tráfico de WebSocket: el
 navegador se conecta a Reverb directo por su propio puerto.
 
+**Reverb es solo el broadcaster local.** Mantener un proceso de WebSocket
+propio corriendo 24/7 no entra en los planes gratuitos de la mayoría de los
+hosts. Por eso el broadcaster es intercambiable por variable de entorno
+(`BROADCAST_CONNECTION` en el backend, `VITE_BROADCASTER` en el frontend):
+en local es Reverb (sin cuenta externa), y el deploy público usa
+[Pusher Channels](https://pusher.com/channels/) (plan gratuito, sin proceso
+propio que mantener). Los eventos (`ColaActualizada`, `PacienteLlamado`) no
+cambian ni el canal ni el payload: solo cambia a qué servidor se conecta el
+cliente.
+
 ## Puesta en marcha
 
 Requisitos: Docker Desktop y Node 20+.
@@ -153,6 +163,53 @@ Los crea el seeder con la contraseña de `SEED_PASSWORD` (por defecto
 | `pediatra@example.com` | profesional (Pediatría) |
 
 Hay uno por especialidad: odontología, ginecología, cardiología y traumatología.
+
+## Demo pública (deploy gratis)
+
+Para tener un link mostrable sin depender de que una máquina local esté
+prendida, hay una imagen Docker aparte en la raíz del repo (`Dockerfile`,
+`docker/render/`, `render.yaml`) pensada específicamente para un hosting
+gratuito como [Render](https://render.com): sirve el build de React y la
+API de Laravel desde el mismo origen (nginx + PHP-FPM en un solo
+contenedor), con SQLite en vez de MySQL y sin Redis — menos piezas externas
+que puedan romperse en un plan gratis. El único servicio de verdad externo
+es [Pusher](https://pusher.com/channels/) para el tiempo real, porque
+mantener un WebSocket propio (Reverb) corriendo 24/7 no entra en un plan
+gratuito. Nada de esto toca el stack de desarrollo local, que sigue siendo
+Docker Compose + MySQL + Redis + Reverb tal como está documentado arriba.
+
+**Trade-offs, a propósito:**
+- La base es efímera: el free tier de Render no tiene disco persistente,
+  así que cada arranque (deploy nuevo, o el contenedor despertando tras
+  dormirse por inactividad) corre `migrate` + `seed` de cero. Es una demo
+  con datos falsos, no hace falta persistir nada entre visitas.
+- Ese mismo free tier duerme el servicio a los 15 minutos sin tráfico: el
+  primer click después de eso tarda ~30–60s en responder (cold start).
+  Después de eso anda normal.
+- `APP_ENV=demo`, no `production`: a propósito, porque `UserSeeder` se
+  niega a correr en producción real (crearía cuentas de contraseña
+  conocida). `APP_DEBUG=false` sigue activo de forma independiente.
+
+### Desplegar
+
+1. Crear una cuenta gratis en [Render](https://render.com) y conectarla a
+   este repositorio de GitHub.
+2. **New +** → **Blueprint** → elegir este repo. Render detecta
+   `render.yaml` solo y arma el servicio.
+3. Antes de que termine de desplegar (o inmediatamente después), completar
+   en el dashboard del servicio → **Environment** las variables que
+   `render.yaml` deja pendientes:
+   - `APP_URL` y `FRONTEND_URL`: la URL completa que Render asignó, ej.
+     `https://gestion-turnos-demo.onrender.com` (se ve en la parte de
+     arriba del dashboard del servicio apenas se crea).
+   - `SANCTUM_STATEFUL_DOMAINS` y `SESSION_DOMAIN`: el mismo dominio, sin
+     `https://` (ej. `gestion-turnos-demo.onrender.com`).
+   - `PUSHER_APP_ID`, `PUSHER_APP_KEY`, `PUSHER_APP_SECRET`,
+     `PUSHER_APP_CLUSTER`: desde
+     [dashboard.pusher.com](https://dashboard.pusher.com), la app de
+     Channels que hayas creado → pestaña **App Keys**.
+4. Redeploy (Render lo hace solo al guardar las variables). Login con
+   cualquier [usuario de ejemplo](#usuarios-de-ejemplo).
 
 ## Decisiones de diseño
 

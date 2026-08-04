@@ -1,0 +1,19 @@
+# Nunca debe entrar a la imagen: son secretos locales, no los del deploy.
+.env
+.env.*
+!.env.example
+
+.git
+_backup-local
+
+gestion-turnos-back/vendor
+gestion-turnos-back/node_modules
+gestion-turnos-back/storage/logs/*
+gestion-turnos-back/storage/framework/cache/data/*
+gestion-turnos-back/storage/framework/sessions/*
+gestion-turnos-back/storage/framework/views/*
+gestion-turnos-back/database/*.sqlite
+gestion-turnos-back/bootstrap/cache/*.php
+
+gestion-turnos-front/node_modules
+gestion-turnos-front/dist
