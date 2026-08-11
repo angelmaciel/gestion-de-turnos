@@ -3,6 +3,13 @@
 # Las variables con `sync: false` hay que completarlas en el dashboard
 # después de crear el servicio — son secretos o dependen de la URL que
 # Render asigna, no pueden vivir en este archivo versionado.
+
+# Cada pull request levanta su propio entorno con instancias nuevas de todo lo
+# definido acá. No se copian datos de los servicios existentes: el preview
+# arranca vacío. Con `manual` el entorno se crea a pedido desde el dashboard.
+previews:
+  generation: automatic
+
 services:
   - type: web
     name: gestion-turnos-demo
