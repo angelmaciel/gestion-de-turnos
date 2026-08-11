@@ -53,11 +53,21 @@ export function Login() {
     } catch (err) {
       console.error('Error en el login:', err);
 
+      const status = err.response?.status;
+
       if (!err.response) {
         setError('No se pudo establecer conexión con el servidor.');
-      } else if (err.response.status === 422 && err.response.data?.errors) {
+      } else if (status === 422 && err.response.data?.errors) {
         const [primerError] = Object.values(err.response.data.errors).flat();
         setError(primerError);
+      } else if (status >= 500) {
+        // Un 5xx trae respuesta, así que antes se colaba por el `else` y
+        // acusaba al usuario de escribir mal una contraseña que estaba bien.
+        setError('El servidor no está respondiendo. Probá de nuevo en unos minutos.');
+      } else if (status === 419) {
+        setError('La sesión expiró. Recargá la página e intentá otra vez.');
+      } else if (status === 429) {
+        setError('Demasiados intentos. Esperá un momento antes de reintentar.');
       } else {
         setError(err.response.data?.message ?? 'Credenciales incorrectas.');
       }
