@@ -5,10 +5,17 @@
 # Render asigna, no pueden vivir en este archivo versionado.
 
 # Cada pull request levanta su propio entorno con instancias nuevas de todo lo
-# definido acá. No se copian datos de los servicios existentes: el preview
-# arranca vacío. Con `manual` el entorno se crea a pedido desde el dashboard.
+# definido acá. Con `manual` el entorno se crea a pedido desde el dashboard.
+#
+# La base no se copia de producción, pero el preview NO arranca vacío: el
+# entrypoint corre `migrate --force` y `db:seed --force` en cada arranque
+# (el disco del free tier es efímero), así que trae los usuarios sembrados.
+#
+# Sin expiración los entornos quedan vivos indefinidamente y con `automatic`
+# se acumulan solos. Tres días cubre la vida útil de una revisión.
 previews:
   generation: automatic
+  expireAfterDays: 3
 
 services:
   - type: web
