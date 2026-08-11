@@ -7,6 +7,9 @@
 # y un bundle del repositorio. No debe salir de esta máquina.
 /_backup-local
 
+# Ajustes locales de Claude Code (personales, no del equipo)
+.claude/settings.local.json
+
 # Dependencias
 node_modules/
 vendor/
