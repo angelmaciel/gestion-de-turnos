@@ -113,6 +113,14 @@
 
   Todo cuelga de `.card-vidrio`, así que no sale de esta pantalla.
 */
+/* El radio va acá y no como utilidad `rounded-3xl`: tailwind-merge no conoce
+   `rounded-panel` (viene de un token propio), así que no lo reemplaza y las
+   dos clases sobreviven con la misma especificidad. Ganaba la que la hoja
+   emitía última, que era `rounded-panel`. */
+.card-vidrio {
+  border-radius: 1.5rem;
+}
+
 .card-vidrio label {
   color: #fff;
 }
@@ -153,9 +161,19 @@
 
 /* Chrome pinta el autocompletado con su propio fondo blanco y rompe el
    vidrio. La sombra interna es el único modo de taparlo. */
-.card-vidrio input:-webkit-autofill,
-.card-vidrio input:-webkit-autofill:focus {
+.card-vidrio input:-webkit-autofill {
   -webkit-text-fill-color: #fff;
   box-shadow: inset 0 0 0 100px rgb(60 70 85 / 0.85);
   caret-color: #fff;
+}
+
+/* Un campo autocompletado enfocado necesita las dos sombras en la misma
+   declaración. Con una regla aparte, la de mayor especificidad pisaba el
+   anillo de foco y el campo quedaba sin ninguna marca visible: el outline
+   nativo tampoco cubre, porque `focus:outline-none` viene de @layer
+   utilities y le gana al `:focus-visible` de @layer base. */
+.card-vidrio input:-webkit-autofill:focus {
+  box-shadow:
+    inset 0 0 0 100px rgb(60 70 85 / 0.85),
+    0 0 0 2px rgb(255 255 255 / 0.55);
 }
