@@ -1,3 +1,41 @@
+# Política de caché, resuelta por URI.
+#
+# Va en un `map` y no con un `add_header` dentro de cada `location` porque en
+# nginx los `add_header` no se heredan: si un bloque declara uno propio,
+# descarta todos los del padre. Poniéndolo por location, `index.html` perdía
+# X-Frame-Options, X-Content-Type-Options y el resto de las cabeceras de
+# seguridad. Con el map queda un solo `add_header` en el server, junto a las
+# demás, y ninguna se pisa.
+#
+# Se mira `$request_uri` y no `$uri`: try_files reescribe internamente
+# (/api/turnos pasa a /index.php, /dashboard pasa a /index.html) y el map se
+# evalúa al emitir las cabeceras, o sea después de esa reescritura. Con `$uri`
+# las respuestas de la API salían con la política por defecto en vez de
+# no-store. `$request_uri` conserva lo que pidió el cliente, con query string
+# incluida, de ahí el `?` en los delimitadores.
+map $request_uri $politica_cache {
+    # index.html y las rutas del router: el nombre es fijo y el contenido
+    # cambia en cada deploy, porque es lo que apunta a los bundles nuevos.
+    # Sin cabecera, el navegador aplica caché heurística —estima solo cuánto
+    # guardarlo mirando el Last-Modified— y sigue pidiendo los bundles viejos
+    # por nombre: una versión anterior de la app servida desde el disco del
+    # visitante, sin forma de que se entere.
+    #
+    # `no-cache` no es "no guardar": guarda, pero revalida antes de usarlo.
+    # Con el ETag que nginx ya emite, si no cambió nada la respuesta es un 304
+    # vacío, así que el costo es un viaje sin cuerpo.
+    default    "no-cache";
+
+    # Vite le pone al bundle un hash del contenido en el nombre
+    # (index-Dh5k7FsP.js): ese archivo nunca cambia, porque cualquier cambio
+    # genera otro nombre. Se puede cachear para siempre, y así un deploy no
+    # obliga a redescargar lo que no se tocó.
+    ~^/assets/    "public, max-age=31536000, immutable";
+
+    # La API nunca se cachea: son datos de turnos que cambian en vivo.
+    ~^/(api|sanctum|up|health)([/?]|$)    "no-store";
+}
+
 server {
     listen ${PORT};
     server_name _;
@@ -9,6 +47,7 @@ server {
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;
+    add_header Cache-Control $politica_cache always;
 
     location ~ /\.(?!well-known) { deny all; access_log off; log_not_found off; }
     location ~* \.(env|log|sql|sqlite|bak|ini|yml|yaml|lock|json)$ { deny all; }
@@ -18,8 +57,10 @@ server {
     # API, Sanctum y las rutas de salud van a Laravel. No hace falta el
     # resolver dinámico de docker-compose: acá php-fpm vive en el mismo
     # contenedor, en localhost.
+    # El `no-store` de estas rutas ahora sale del map de arriba. Tenerlo acá
+    # como add_header propio descartaba, justo en las respuestas de la API,
+    # las cuatro cabeceras de seguridad del server.
     location ~ ^/(api|sanctum|up|health)(/|$) {
-        add_header Cache-Control "no-store" always;
         try_files $uri $uri/ /index.php?$query_string;
     }
 
