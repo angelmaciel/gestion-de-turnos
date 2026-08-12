@@ -4,7 +4,10 @@ import { Button } from './ui';
 
 // Cada rol solo ve los accesos que puede usar; el admin los ve todos.
 const ENLACES = [
-  { to: '/reception', label: 'Recepción', roles: ['mesa de entrada'] },
+  // El label sigue al nombre del rol, que es como se llama el puesto adentro
+  // del centro. La ruta queda en /reception por compatibilidad con los enlaces
+  // ya repartidos.
+  { to: '/reception', label: 'Mesa de entrada', roles: ['mesa de entrada'] },
   { to: '/triage', label: 'Preconsulta', roles: ['preconsulta'] },
   { to: '/doctor', label: 'Consultorio', roles: ['profesional'] },
   { to: '/admin/torre-control', label: 'Torre de Control', roles: ['admin'] },
