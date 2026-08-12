@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import { Navbar } from '../components/Navbar';
 import { Alert, Button, Card, CardBody, CardHeader, Field, Input, PageHeader, Select } from '../components/ui';
@@ -11,21 +11,38 @@ import { Alert, Button, Card, CardBody, CardHeader, Field, Input, PageHeader, Se
 const FORMULARIO_VACIO = { patient_dni: '', patient_name: '', specialty_id: '' };
 
 /*
-  El campo directamente no deja escribir lo que la regla del backend va a
-  rechazar: descartar el caracter al tipearlo es más barato que mandar el
-  formulario, esperar el 422 y volver a corregir.
+  Reglas del cliente, espejo de las de StoreAppointmentRequest.
 
-  No reemplaza a la validación del servidor —que es la que vale para la
-  auditoría— sino que evita llegar hasta ella por un punto de más.
+  El campo sigue sin dejar escribir lo que el backend va a rechazar, pero
+  ahora lo dice. Descartar el caracter en silencio era peor que no filtrar:
+  la tecla no respondía y no había forma de saber por qué, y de paso el
+  mensaje bajo el campo no llegaba a aparecer nunca, porque el error que lo
+  dispara jamás salía del navegador.
+
+  `filtro` limpia lo que se tipea o se pega, `rechazo` explica qué se
+  descartó, y `exigir` es la comprobación al salir del campo y al enviar.
 
   El nombre conserva acentos y ñ (\p{L}), las tildes que algunos teclados
   mandan como caracter combinante (\p{M}), y los apóstrofos y guiones de
   "D'Angelo" o "García-Ruiz". Pegar "1.234.567" en la cédula deja "1234567".
 */
-const FILTROS = {
-  patient_dni: (valor) => valor.replace(/\D+/g, ''),
-  patient_name: (valor) => valor.replace(/[^\p{L}\p{M}\s'’-]+/gu, ''),
+const REGLAS = {
+  patient_dni: {
+    filtro: (valor) => valor.replace(/\D+/g, ''),
+    rechazo: 'La cédula solo admite números, sin puntos ni letras.',
+    exigir: (valor) => (valor.trim() === '' ? 'Ingresá la cédula del paciente.' : ''),
+  },
+  patient_name: {
+    filtro: (valor) => valor.replace(/[^\p{L}\p{M}\s'’-]+/gu, ''),
+    rechazo: 'El nombre solo admite letras, espacios, apóstrofos y guiones.',
+    exigir: (valor) => (valor.trim() === '' ? 'Ingresá el nombre y apellido.' : ''),
+  },
+  specialty_id: {
+    exigir: (valor) => (valor === '' ? 'Elegí una especialidad.' : ''),
+  },
 };
+
+const CAMPOS = Object.keys(REGLAS);
 
 export function Reception() {
   const [form, setForm] = useState(FORMULARIO_VACIO);
@@ -42,6 +59,13 @@ export function Reception() {
   const [errorEspecialidades, setErrorEspecialidades] = useState('');
   const [enviando, setEnviando] = useState(false);
 
+  // Para llevar el foco al primer campo que falta cuando se intenta enviar.
+  // Sueltas y no dentro de un objeto: la regla react-hooks/refs no distingue
+  // `refs.x` de leer un `.current` durante el render, y marca error.
+  const cedulaRef = useRef(null);
+  const nombreRef = useRef(null);
+  const especialidadRef = useRef(null);
+
   useEffect(() => {
     api.get('/especialidades')
       .then((res) => {
@@ -54,20 +78,42 @@ export function Reception() {
       .finally(() => setCargandoEspecialidades(false));
   }, []);
 
-  // Un error al lado de un campo que ya se está corrigiendo miente sobre el
-  // estado actual del formulario: se limpia al primer tecleo.
+  const marcar = (campo, mensaje) => {
+    setErrores((actuales) => {
+      if ((actuales[campo] ?? '') === mensaje) return actuales;
+
+      const siguiente = { ...actuales };
+
+      if (mensaje) {
+        siguiente[campo] = mensaje;
+      } else {
+        delete siguiente[campo];
+      }
+
+      return siguiente;
+    });
+  };
+
   const editar = (campo) => (e) => {
-    const value = FILTROS[campo] ? FILTROS[campo](e.target.value) : e.target.value;
+    const tecleado = e.target.value;
+    const filtro = REGLAS[campo].filtro;
+    const value = filtro ? filtro(tecleado) : tecleado;
 
     setForm((actual) => ({ ...actual, [campo]: value }));
     setAvisoEnvio('');
-    setErrores((actuales) => {
-      if (!actuales[campo]) return actuales;
 
-      const resto = { ...actuales };
-      delete resto[campo];
-      return resto;
-    });
+    // Si el filtro descartó algo, el campo lo dice en vez de tragárselo. Un
+    // error viejo al lado de un campo que ya se está corrigiendo miente sobre
+    // el estado actual, así que en cualquier otro caso se limpia.
+    marcar(campo, value === tecleado ? '' : REGLAS[campo].rechazo);
+  };
+
+  // Al salir del campo, no antes: avisar que falta algo mientras todavía se
+  // está escribiendo es corregir a alguien a mitad de la frase.
+  const revisar = (campo) => () => {
+    if (errores[campo] === REGLAS[campo].rechazo) return;
+
+    marcar(campo, REGLAS[campo].exigir(form[campo]));
   };
 
   const handleSubmit = async (e) => {
@@ -75,6 +121,38 @@ export function Reception() {
     if (enviando) return;
 
     setAvisoEnvio('');
+
+    /*
+      El formulario lleva `noValidate`: la comprobación de obligatorios la hace
+      esta función y no el navegador. El globo nativo aparece de a uno, se va
+      solo a los pocos segundos, no lo lee `aria-describedby` y se dibuja con
+      un estilo que no es el del resto. Teniendo mensajes por campo, tener dos
+      formas distintas de decir lo mismo sobra.
+    */
+    const faltantes = {};
+
+    for (const campo of CAMPOS) {
+      const mensaje = REGLAS[campo].exigir(form[campo]);
+      if (mensaje) faltantes[campo] = mensaje;
+    }
+
+    if (Object.keys(faltantes).length > 0) {
+      setErrores(faltantes);
+
+      // El foco va al primero que falta, en el orden en que están en pantalla:
+      // así se corrige con el teclado, sin buscar el campo con el mouse.
+      const primero = CAMPOS.find((campo) => faltantes[campo]);
+      const destino = {
+        patient_dni: cedulaRef,
+        patient_name: nombreRef,
+        specialty_id: especialidadRef,
+      }[primero];
+
+      destino.current?.focus();
+
+      return;
+    }
+
     setErrores({});
     setEnviando(true);
 
@@ -164,7 +242,7 @@ export function Reception() {
         <Card>
           <CardHeader title="Nuevo turno" description="Los tres datos son obligatorios." />
           <CardBody>
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
               {/* Arriba y no debajo del botón: después de enviar, la vista
                   queda en el formulario y un aviso al pie pasa desapercibido. */}
               {avisoEnvio && <Alert tone="critical">{avisoEnvio}</Alert>}
@@ -175,9 +253,10 @@ export function Reception() {
                 <Field label="Cédula de identidad" htmlFor="cedula" error={errores.patient_dni}>
                   <Input
                     id="cedula"
+                    ref={cedulaRef}
                     value={form.patient_dni}
                     onChange={editar('patient_dni')}
-                    required
+                    onBlur={revisar('patient_dni')}
                     autoFocus
                     inputMode="numeric"
                     maxLength={20}
@@ -192,9 +271,10 @@ export function Reception() {
                 <Field label="Nombre y apellido" htmlFor="nombre" error={errores.patient_name}>
                   <Input
                     id="nombre"
+                    ref={nombreRef}
                     value={form.patient_name}
                     onChange={editar('patient_name')}
-                    required
+                    onBlur={revisar('patient_name')}
                     maxLength={100}
                     autoComplete="off"
                     placeholder="Nombre del paciente"
@@ -206,9 +286,10 @@ export function Reception() {
                 <Field label="Especialidad" htmlFor="especialidad" error={errores.specialty_id}>
                   <Select
                     id="especialidad"
+                    ref={especialidadRef}
                     value={form.specialty_id}
                     onChange={editar('specialty_id')}
-                    required
+                    onBlur={revisar('specialty_id')}
                     disabled={sinEspecialidades}
                     aria-busy={cargandoEspecialidades || undefined}
                     invalid={Boolean(errores.specialty_id)}
