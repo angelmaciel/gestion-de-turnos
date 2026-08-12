@@ -23,16 +23,46 @@ const TAMANOS_BOTON = {
   lg: 'h-11 px-6 text-base',
 };
 
+/**
+ * Indicador de progreso. `aria-hidden` porque quien lo acompaña ya comunica
+ * el estado por texto (`aria-busy`, un aviso): duplicarlo sería ruido.
+ */
+export function Spinner({ className }) {
+  return (
+    <svg
+      className={cn('size-4 animate-spin', className)}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+      <path
+        d="M14 8a6 6 0 0 0-6-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function Button({
   variant = 'primary',
   size = 'md',
   className,
   type = 'button',
+  loading = false,
+  disabled = false,
+  children,
   ...props
 }) {
   return (
     <button
       type={type}
+      // Mientras carga el botón no debe aceptar un segundo click, aunque
+      // quien lo usa no haya pasado `disabled`.
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-control font-medium',
         'transition-colors disabled:pointer-events-none disabled:opacity-50',
@@ -41,7 +71,10 @@ export function Button({
         className
       )}
       {...props}
-    />
+    >
+      {loading && <Spinner />}
+      {children}
+    </button>
   );
 }
 
@@ -82,13 +115,27 @@ export function Field({ label, hint, htmlFor, children, className }) {
   );
 }
 
+/* `text-base` en móvil no es un capricho de escala: Safari en iOS hace zoom
+   automático al enfocar un campo de menos de 16px, y al salir deja la página
+   corrida. De sm en adelante vuelve a 14px, que es la escala del sistema. */
 const ESTILO_CONTROL =
-  'w-full rounded-control border border-line-strong bg-surface px-3 text-sm text-ink ' +
+  'w-full rounded-control border border-line-strong bg-surface px-3 text-base text-ink sm:text-sm ' +
   'placeholder:text-subtle disabled:opacity-60 focus:border-accent focus:outline-none ' +
   'focus:ring-2 focus:ring-accent/20';
 
-export function Input({ className, ...props }) {
-  return <input className={cn(ESTILO_CONTROL, 'h-10', className)} {...props} />;
+/* Un campo con error se marca por borde y por `aria-invalid`: el color solo no
+   alcanza para quien no lo distingue o no ve la pantalla. */
+const ESTILO_CONTROL_INVALIDO =
+  'border-critical focus:border-critical focus:ring-critical/20';
+
+export function Input({ className, invalid = false, ...props }) {
+  return (
+    <input
+      aria-invalid={invalid || undefined}
+      className={cn(ESTILO_CONTROL, 'h-10', invalid && ESTILO_CONTROL_INVALIDO, className)}
+      {...props}
+    />
+  );
 }
 
 export function Select({ className, children, ...props }) {
@@ -120,16 +167,24 @@ export function Badge({ tone = 'neutral', className, ...props }) {
   );
 }
 
-/** Aviso de resultado de una acción. El tono comunica, no un emoji. */
-export function Alert({ tone = 'neutral', className, children }) {
+/**
+ * Aviso de resultado de una acción. El tono comunica, no un emoji.
+ *
+ * Un aviso crítico se anuncia con `role="alert"` (interrumpe al lector de
+ * pantalla) y el resto con `role="status"` (espera a que termine de leer):
+ * un error de login que nadie anuncia deja al usuario esperando sin saber
+ * que la acción falló.
+ */
+export function Alert({ tone = 'neutral', className, children, ...props }) {
   return (
     <div
-      role="status"
+      role={tone === 'critical' ? 'alert' : 'status'}
       className={cn(
         'rounded-control border px-4 py-3 text-sm',
         TONOS_BADGE[tone],
         className
       )}
+      {...props}
     >
       {children}
     </div>
