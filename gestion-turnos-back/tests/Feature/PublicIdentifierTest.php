@@ -48,11 +48,15 @@ it('no permite enumerar turnos por el id autoincremental', function () {
 it('numera los turnos de forma correlativa por día', function () {
     $entrada = usuarioCon('mesa de entrada');
 
-    $numeros = collect(range(1, 3))->map(function (int $i) use ($entrada) {
+    // Nombres sin dígitos: el alta los rechaza, porque un número dentro del
+    // nombre ensucia la búsqueda del paciente en el historial.
+    $nombres = ['Paciente Uno', 'Paciente Dos', 'Paciente Tres'];
+
+    $numeros = collect(range(1, 3))->map(function (int $i) use ($entrada, $nombres) {
         return $this->actingAs($entrada, 'sanctum')
             ->postJson('/api/entrada/turnos', [
                 'patient_dni' => "1000{$i}",
-                'patient_name' => "Paciente {$i}",
+                'patient_name' => $nombres[$i - 1],
                 'specialty_id' => $this->specialty->id,
             ])
             ->assertCreated()
