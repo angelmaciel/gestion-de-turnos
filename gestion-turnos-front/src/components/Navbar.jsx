@@ -11,6 +11,10 @@ const ENLACES = [
   { to: '/triage', label: 'Preconsulta', roles: ['preconsulta'] },
   { to: '/doctor', label: 'Consultorio', roles: ['profesional'] },
   { to: '/admin/torre-control', label: 'Torre de Control', roles: ['admin'] },
+  // La pantalla de sala es el televisor de la espera: la despliega el
+  // profesional, que es quien canta el turno, o el admin al montar el puesto.
+  // Mesa de entrada y preconsulta no la necesitan.
+  { to: '/tv', label: 'Pantalla de sala', roles: ['profesional', 'admin'], externo: true },
 ];
 
 export function Navbar() {
@@ -44,6 +48,9 @@ export function Navbar() {
               <Link
                 key={enlace.to}
                 to={enlace.to}
+                // La pantalla de sala va en otra pestaña: se deja abierta en el
+                // televisor y quien la abrió sigue trabajando en la suya.
+                target={enlace.externo ? '_blank' : undefined}
                 aria-current={activo ? 'page' : undefined}
                 className={
                   activo
@@ -55,14 +62,6 @@ export function Navbar() {
               </Link>
             );
           })}
-
-          <Link
-            to="/tv"
-            target="_blank"
-            className="rounded-control px-3 py-1.5 text-sm text-muted transition-colors hover:bg-canvas hover:text-ink"
-          >
-            Pantalla de sala
-          </Link>
         </div>
 
         <div className="flex items-center gap-4">
