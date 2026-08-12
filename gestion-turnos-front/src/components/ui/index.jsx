@@ -103,14 +103,30 @@ export function CardBody({ className, ...props }) {
   return <div className={cn('p-5', className)} {...props} />;
 }
 
-export function Field({ label, hint, htmlFor, children, className }) {
+/**
+ * Campo de formulario con su etiqueta y, si corresponde, el motivo por el que
+ * quedó mal.
+ *
+ * El mensaje de error toma el id `<htmlFor>-error` para que el control lo
+ * referencie con `aria-describedby`: sin esa relación, un lector de pantalla
+ * anuncia el campo sin decir qué tiene de malo.
+ */
+export function Field({ label, hint, error, htmlFor, children, className }) {
   return (
     <div className={cn('space-y-1.5', className)}>
       <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
         {label}
       </label>
       {children}
-      {hint && <p className="text-xs text-muted">{hint}</p>}
+      {/* El error reemplaza a la pista y no se suma: repetir cómo había que
+          completar el campo compite con el mensaje que hay que leer ahora. */}
+      {error ? (
+        <p id={htmlFor ? `${htmlFor}-error` : undefined} className="text-xs text-critical">
+          {error}
+        </p>
+      ) : (
+        hint && <p className="text-xs text-muted">{hint}</p>
+      )}
     </div>
   );
 }
@@ -138,9 +154,13 @@ export function Input({ className, invalid = false, ...props }) {
   );
 }
 
-export function Select({ className, children, ...props }) {
+export function Select({ className, invalid = false, children, ...props }) {
   return (
-    <select className={cn(ESTILO_CONTROL, 'h-10', className)} {...props}>
+    <select
+      aria-invalid={invalid || undefined}
+      className={cn(ESTILO_CONTROL, 'h-10', invalid && ESTILO_CONTROL_INVALIDO, className)}
+      {...props}
+    >
       {children}
     </select>
   );
