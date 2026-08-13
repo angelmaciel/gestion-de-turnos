@@ -2,11 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../context/authContextValue';
 import { Button, Card, CardBody, PageHeader } from '../components/ui';
-import fondoGestion from '../assets/fondoGestion.jpg';
 
 const MODULOS = [
   {
-    titulo: 'Recepción',
+    // Se llama igual que el rol y que el enlace del navbar. Este quedó como
+    // "Recepción" cuando se unificó el nombre en el resto del sistema.
+    titulo: 'Mesa de entrada',
     descripcion: 'Registrar pacientes y emitir turnos.',
     accion: 'Abrir',
     ruta: '/reception',
@@ -59,30 +60,26 @@ export function Dashboard() {
   return (
     <>
       <Navbar />
-      <div
-        className="min-h-[calc(100vh-3.5rem)] bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${fondoGestion})` }}
-      >
-        <div className="min-h-[calc(100vh-3.5rem)] bg-canvas/50">
-          <main className="mx-auto max-w-4xl px-6 py-8">
-            <PageHeader title="Módulos" description="Elegí la pantalla según la tarea." />
+      {/* Sin foto de fondo: era la única pantalla interna que tenía una, y
+          encima detrás de un velo al 50% que la lavaba a la mitad. Queda sobre
+          el lienzo del sistema, igual que las demás. */}
+      <main className="mx-auto max-w-4xl px-6 py-8">
+        <PageHeader title="Módulos" description="Elegí la pantalla según la tarea." />
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {modulos.map((modulo) => (
-                <Card key={modulo.ruta}>
-                  <CardBody className="flex h-full flex-col">
-                    <h2 className="text-sm font-semibold">{modulo.titulo}</h2>
-                    <p className="mt-1 mb-5 flex-1 text-sm text-muted">{modulo.descripcion}</p>
-                    <Button variant="secondary" onClick={() => abrir(modulo)} className="w-full">
-                      {modulo.accion}
-                    </Button>
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
-          </main>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {modulos.map((modulo) => (
+            <Card key={modulo.ruta}>
+              <CardBody className="flex h-full flex-col">
+                <h2 className="text-sm font-semibold">{modulo.titulo}</h2>
+                <p className="mt-1 mb-5 flex-1 text-sm text-muted">{modulo.descripcion}</p>
+                <Button variant="secondary" onClick={() => abrir(modulo)} className="w-full">
+                  {modulo.accion}
+                </Button>
+              </CardBody>
+            </Card>
+          ))}
         </div>
-      </div>
+      </main>
     </>
   );
 }
