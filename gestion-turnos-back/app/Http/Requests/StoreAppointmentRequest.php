@@ -6,18 +6,13 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreAppointmentRequest extends FormRequest
 {
-    /*
-      La cédula identifica al paciente en el historial, así que se guarda en un
-      solo formato: dígitos pelados. Admitir "1.234.567" y "1234567" a la vez
-      parte al mismo paciente en dos fichas y deja una auditoría que no cierra.
-    */
+    /** Un solo formato en el historial: dígitos pelados. */
     private const PATRON_CEDULA = '/^\d+$/';
 
     /*
-      Letras, espacios, apóstrofos y guiones: alcanza para "D'Angelo" o
-      "García-Ruiz" sin dejar pasar dígitos ni signos que solo entran por error
-      de tipeo. \p{L} cubre acentos y ñ, y \p{M} las tildes que llegan como
-      caracter combinante desde algunos teclados.
+      Alcanza para "D'Angelo" o "García-Ruiz" sin dejar pasar dígitos. \p{L}
+      cubre acentos y ñ; \p{M}, las tildes que algunos teclados mandan como
+      caracter combinante.
     */
     private const PATRON_NOMBRE = '/^[\p{L}\p{M}\s\'’\-]+$/u';
 
@@ -37,9 +32,7 @@ class StoreAppointmentRequest extends FormRequest
 
         $this->merge([
             'patient_dni' => is_string($dni) ? trim($dni) : $dni,
-            // Espacios de más al costado o en el medio hacen que dos altas del
-            // mismo paciente no coincidan al buscarlo. Se normaliza acá, antes
-            // de validar, y no después de guardar.
+            // Sin esto, dos altas del mismo paciente no coinciden al buscar.
             'patient_name' => is_string($nombre)
                 ? preg_replace('/\s+/u', ' ', trim($nombre))
                 : $nombre,
@@ -58,8 +51,8 @@ class StoreAppointmentRequest extends FormRequest
     }
 
     /**
-     * El mensaje genérico de `regex` ("el formato es inválido") no dice qué
-     * corregir, y este es el texto que mesa de entrada lee bajo el campo.
+     * El genérico de `regex` no dice qué corregir, y este es el texto que se
+     * lee bajo el campo.
      *
      * @return array<string, string>
      */

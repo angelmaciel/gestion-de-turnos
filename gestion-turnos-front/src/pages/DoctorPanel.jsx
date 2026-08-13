@@ -20,19 +20,14 @@ export function DoctorPanel() {
   const [queue, setQueue] = useState([]);
   const [currentPatient, setCurrentPatient] = useState(null);
   const [mensaje, setMensaje] = useState(null);
-  // Aparte del resultado de cada acción: un usuario sin perfil profesional no
-  // puede hacer nada acá, y ese aviso no puede desaparecer porque después se
-  // haya intentado otra cosa. Compartiendo estado, el primer intento lo
-  // borraba y la pantalla quedaba vacía sin explicar por qué.
+  // Aparte del resultado de cada acción: sin perfil profesional no se puede
+  // hacer nada acá, y ese aviso no puede borrarse al intentar otra cosa.
   const [errorPerfil, setErrorPerfil] = useState('');
 
   /*
-    Qué acción está viajando. Sirve para dos cosas a la vez: mostrar el
-    spinner en el botón correcto y bloquear el resto.
-
-    Sin esto, dos clicks seguidos en "Llamar" mandaban dos peticiones. Llamar
-    incrementa `attempts` en el backend, asi que el contador de llamados
-    quedaba inflado y el altavoz cantaba el mismo turno dos veces.
+    Qué acción está viajando: pone el spinner en el botón correcto y bloquea
+    el resto. Llamar incrementa `attempts`, así que sin guarda dos clicks
+    inflan el contador y el altavoz canta el mismo turno dos veces.
   */
   const [enVuelo, setEnVuelo] = useState(null);
 
@@ -61,14 +56,9 @@ export function DoctorPanel() {
   useColaEnVivo(fetchQueue);
 
   /*
-    La animación de entrada la reciben solo los turnos que acaban de aparecer.
-    La cola se refresca por WebSocket y cada 30 segundos: animarla entera en
-    cada refresco sería movimiento sin motivo varias veces por minuto, en una
-    pantalla que queda abierta toda la jornada.
-
-    Acá importa más que en preconsulta, porque el profesional no está mirando
-    la lista: trabaja con el paciente enfrente y la consulta de reojo. Que la
-    fila nueva se anuncie sola es la diferencia entre notarla y no.
+    Solo se anima el turno recién llegado. Acá pesa más que en preconsulta: el
+    profesional no mira la lista, trabaja con el paciente enfrente y la
+    consulta de reojo.
   */
   const idsPrevios = useRef(new Set());
   const [nuevos, setNuevos] = useState(() => new Set());
@@ -120,11 +110,8 @@ export function DoctorPanel() {
     return handleCallPatient(currentPatient, 'rellamar');
   };
 
-  /*
-    Cierre del turno actual, atendido o ausente. Las dos acciones difieren en
-    la ruta, el tono y el texto, asi que compartir el cuerpo evita que una se
-    arregle y la otra quede atrás.
-  */
+  // Cierre del turno, atendido o ausente: mismo procedimiento con distinta
+  // ruta, tono y texto.
   const cerrarTurno = async ({ ruta, etiqueta, tono, texto, siFalla }) => {
     if (!currentPatient || enVuelo) return;
 
@@ -174,9 +161,8 @@ export function DoctorPanel() {
           <CardHeader title="En consultorio" />
           <CardBody>
             {currentPatient ? (
-              // La ficha vuelve a entrar cada vez que cambia el turno: llamar
-              // al paciente equivocado es el error más caro de esta pantalla,
-              // y el movimiento confirma que ahora habla de otra persona.
+              // Vuelve a entrar al cambiar el turno: llamar al paciente
+              // equivocado es el error más caro de esta pantalla.
               <div key={currentPatient.id} className="entra-fila space-y-5">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                   <span className="tabular text-4xl font-semibold text-accent">
@@ -216,10 +202,8 @@ export function DoctorPanel() {
                   <DataPoint label="Llamados" value={currentPatient.attempts ?? 0} />
                 </dl>
 
-                {/* Cada botón muestra su propio spinner, pero mientras algo
-                    viaja se bloquean los tres: finalizar y marcar ausente son
-                    cierres distintos del mismo turno y no pueden salir a la
-                    vez. */}
+                {/* Se bloquean los tres: finalizar y ausente son cierres
+                    distintos del mismo turno y no pueden salir a la vez. */}
                 <div className="flex flex-wrap gap-3">
                   <Button
                     variant="secondary" onClick={recallCurrent} className="flex-1"

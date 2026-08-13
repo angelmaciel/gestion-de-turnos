@@ -10,8 +10,8 @@ actualización en tiempo real y aviso por voz.
 <tr>
 <td width="50%">
 
-**Recepción** — registra al paciente y emite el turno.
-<img src="docs/screenshots/04-recepcion.jpg" alt="Pantalla de Recepción">
+**Mesa de entrada** — registra al paciente y emite el turno.
+<img src="docs/screenshots/04-recepcion.jpg" alt="Pantalla de Mesa de entrada">
 </td>
 <td width="50%">
 
@@ -48,11 +48,11 @@ actualización en tiempo real y aviso por voz.
 ## Flujo
 
 ```
-Recepción  ──▶  Preconsulta  ──▶  Consultorio  ──▶  Pantalla de sala
+Mesa de entrada ──▶ Preconsulta  ──▶  Consultorio  ──▶  Pantalla de sala
 registrado   preconsulta_completa    llamado      atendido / ausente
 ```
 
-1. **Recepción** registra al paciente (cédula, nombre) y elige la especialidad.
+1. **Mesa de entrada** registra al paciente (cédula, nombre) y elige la especialidad.
    El turno recibe un número correlativo que reinicia cada día.
 2. **Preconsulta** busca al paciente, carga peso, altura y presión. El IMC se
    calcula solo y se muestra con su categoría.
@@ -237,7 +237,7 @@ Detalle completo de las protecciones en [SEGURIDAD.md](SEGURIDAD.md).
 
 ## Verificación
 
-44 tests (Pest) sobre lo que realmente puede fallar en un sistema con datos de
+79 tests (Pest) sobre lo que realmente puede fallar en un sistema con datos de
 salud, no sobre getters y setters:
 
 - **Autorización cruzada** — un profesional de otra especialidad no ve ni
@@ -266,6 +266,16 @@ salud, no sobre getters y setters:
 - **Concurrencia e idempotencia** — el correlativo diario no se duplica ni se
   mezcla entre días, y recalcular las estadísticas de un día no crea filas
   repetidas (`no mezcla turnos de otro dia en el conteo`).
+- **Integridad de los datos de identidad** — la cédula solo admite dígitos y el
+  nombre solo letras, espacios, apóstrofos y guiones. No es cosmética: el
+  índice ciego normaliza puntos y guiones, pero no las letras, así que
+  `A1234567` abría una ficha nueva para el mismo paciente
+  (`rechaza cédulas que no sean solo dígitos`,
+  `acepta nombres con acentos, ñ, apóstrofos y guiones`).
+- **Integridad de los signos vitales** — la presión arterial exige forma
+  `sistólica/diastólica` y rangos fisiológicos, y rechaza la invertida. Antes
+  era texto libre y `xx` entraba como medición
+  (`rechaza valores con formato correcto pero fuera de lo posible`).
 
 ```bash
 cd gestion-turnos-back

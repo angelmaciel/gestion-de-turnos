@@ -23,22 +23,17 @@ export function AdminControlTower() {
   const [salas, setSalas] = useState([]);
   const [mensaje, setMensaje] = useState(null);
   const [sinPermiso, setSinPermiso] = useState(false);
-  // Sala cuyo cambio de limpieza está viajando. Sin esto, dos clicks seguidos
-  // mandaban dos peticiones y el botón no daba ninguna señal de haber
-  // registrado el primero hasta que volvía el refresco.
+  // Sala cuyo cambio de limpieza viaja: sin esto, dos clicks mandan dos
+  // peticiones y el botón no da señal de haber registrado el primero.
   const [enVuelo, setEnVuelo] = useState(null);
 
   /*
-    Salas que acaban de cambiar de estado.
+    Salas que acaban de cambiar de estado. La pantalla se deja abierta en una
+    pared: nadie la está leyendo cuando el estado cambia, y el movimiento es
+    lo que hace que se note.
 
-    Esta pantalla existe para "identificar el cuello de botella de un
-    vistazo", y se deja abierta en una pared o en un monitor de costado: nadie
-    la está leyendo cuando el estado cambia. El movimiento es lo que hace que
-    el cambio se note sin tener que comparar contra lo que uno recordaba.
-
-    Se anima el cambio y no el refresco. `useColaEnVivo` recarga cada 30
-    segundos aunque no haya pasado nada, y animar las tarjetas en cada recarga
-    convertiría la señal en ruido de fondo, que es peor que no animar.
+    Se anima el cambio, no el refresco: recargar cada 30 segundos y animar
+    todo convertiría la señal en ruido de fondo.
   */
   const estadoPrevio = useRef(new Map());
   const [cambiaron, setCambiaron] = useState(() => new Set());
@@ -69,9 +64,8 @@ export function AdminControlTower() {
       .filter((sala) => {
         const previo = estadoPrevio.current.get(sala.room_id);
 
-        // En el primer render no hay contra qué comparar: sin esto, todas las
-        // salas contarían como recién cambiadas y la pantalla arrancaría
-        // parpadeando entera.
+        // En el primer render no hay contra qué comparar: sin esto la
+        // pantalla arrancaría parpadeando entera.
         return previo !== undefined && previo !== sala.status;
       })
       .map((sala) => sala.room_id);
@@ -152,10 +146,8 @@ export function AdminControlTower() {
                     )}
                   </dl>
 
-                  {/* Mientras una sala viaja se bloquean todas: el snapshot
-                      que vuelve reordena la grilla entera, asi que dos
-                      cambios simultaneos dejarian botones apuntando a un
-                      estado que ya no es el vigente. */}
+                  {/* Se bloquean todas: el snapshot reordena la grilla, y dos
+                      cambios a la vez dejarían botones desfasados. */}
                   <Button
                     variant="secondary"
                     className="w-full"
