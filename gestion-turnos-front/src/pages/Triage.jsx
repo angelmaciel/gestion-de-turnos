@@ -161,10 +161,10 @@ export function Triage() {
                           type="button"
                           onClick={() => seleccionar(app)}
                           aria-pressed={activo}
-                          className={`w-full rounded-control border px-3 py-2.5 text-left transition-colors ${
+                          className={`pulsable w-full rounded-control border px-3 py-2.5 text-left transition-colors ${
                             activo
                               ? 'border-accent bg-accent-soft'
-                              : 'border-line hover:border-line-strong hover:bg-canvas'
+                              : 'border-line hover-fino:hover:border-line-strong hover-fino:hover:bg-canvas'
                           }`}
                         >
                           <div className="flex items-baseline justify-between gap-3">
