@@ -54,8 +54,8 @@ export function Navbar() {
                 aria-current={activo ? 'page' : undefined}
                 className={
                   activo
-                    ? 'rounded-control bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent'
-                    : 'rounded-control px-3 py-1.5 text-sm text-muted transition-colors hover:bg-canvas hover:text-ink'
+                    ? 'pulsable rounded-control bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent'
+                    : 'pulsable rounded-control px-3 py-1.5 text-sm text-muted transition-colors hover-fino:hover:bg-canvas hover-fino:hover:text-ink'
                 }
               >
                 {enlace.label}

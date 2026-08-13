@@ -8,13 +8,20 @@ import { cn } from '../../lib/cn';
   luchar contra estilos que no se ven.
 */
 
+/*
+  Los `hover:` van detrás de `hover-fino:`, una variante propia que exige
+  puntero de verdad (ver index.css). En una tablet el tap dispara `:hover` y
+  el color queda pegado después de soltar, como si el botón siguiera bajo el
+  dedo. En mesa de entrada, que puede trabajar con tablet, eso deja media
+  pantalla con controles falsamente resaltados.
+*/
 const VARIANTES_BOTON = {
-  primary: 'bg-accent text-white hover:bg-accent-hover',
-  secondary: 'bg-surface text-ink border border-line-strong hover:bg-canvas',
-  ghost: 'text-muted hover:bg-canvas hover:text-ink',
-  positive: 'bg-positive text-white hover:brightness-95',
-  critical: 'bg-critical text-white hover:brightness-95',
-  warning: 'bg-warning text-white hover:brightness-95',
+  primary: 'bg-accent text-white hover-fino:hover:bg-accent-hover',
+  secondary: 'bg-surface text-ink border border-line-strong hover-fino:hover:bg-canvas',
+  ghost: 'text-muted hover-fino:hover:bg-canvas hover-fino:hover:text-ink',
+  positive: 'bg-positive text-white hover-fino:hover:brightness-95',
+  critical: 'bg-critical text-white hover-fino:hover:brightness-95',
+  warning: 'bg-warning text-white hover-fino:hover:brightness-95',
 };
 
 const TAMANOS_BOTON = {
@@ -65,7 +72,27 @@ export function Button({
       aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-control font-medium',
-        'transition-colors disabled:pointer-events-none disabled:opacity-50',
+        // Propiedades enumeradas y no `transition-all`: `all` incluye layout,
+        // que no se puede acelerar por GPU y ademas anima cosas que nadie
+        // pidio, como el ancho al cambiar el texto del boton.
+        //
+        // `scale` va aparte de `transform` porque Tailwind 4 implementa
+        // `scale-*` con la propiedad `scale` independiente. Declarando solo
+        // `transform`, el hundido al pulsar saltaba de golpe: la transicion
+        // no alcanzaba a la propiedad que realmente cambia.
+        'transition-[background-color,color,border-color,filter,transform,scale]',
+        // 140ms: por debajo de 300ms, que es el techo de lo que se siente
+        // inmediato. Un pulsado mas largo se percibe como demora del sistema.
+        'duration-140 ease-salida',
+        // El hundido al pulsar sale de `.pulsable` (index.css) y no de
+        // `active:scale-*`. Tener las dos implementaciones era un choque:
+        // Tailwind escribe la propiedad `scale` y `.pulsable` escribe
+        // `transform`, las dos con la misma especificidad, y ganaba la que la
+        // hoja emitiera ultima. Con una sola, el navbar, las filas de
+        // preconsulta y los botones se hunden igual y respetan la misma regla
+        // de movimiento reducido.
+        'pulsable',
+        'disabled:pointer-events-none disabled:opacity-50',
         VARIANTES_BOTON[variant],
         TAMANOS_BOTON[size],
         className

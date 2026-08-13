@@ -39,7 +39,28 @@
 
   --radius-control: 0.5rem;
   --radius-panel: 0.75rem;
+
+  /* Curva propia: las de CSS son deliberadamente suaves y en interfaz se leen
+     como demora. Esta arranca rápido y frena al final, que es lo que hace que
+     un control se sienta atento al click.
+
+     Va en el namespace `--ease-*` de Tailwind, así que genera la utilidad
+     `ease-salida` sola. Escribirla como valor arbitrario tipo
+     `ease-[--ease-salida]` no sirve: en Tailwind 4 esos corchetes no expanden
+     a `var(...)` y emiten `transition-timing-function:--ease-salida`, que es
+     CSS inválido y el navegador descarta sin avisar.
+
+     `ease-in` no aparece en ningún lado a propósito: empieza lento, justo en
+     el instante que la persona está mirando, y hace sentir lenta a la misma
+     duración. */
+  --ease-salida: cubic-bezier(0.23, 1, 0.32, 1);
 }
+
+/* Variante propia para el hover: solo se aplica donde hay un puntero real que
+   puede posarse sin hacer click. En pantallas táctiles el navegador dispara
+   `:hover` al tocar y lo deja pegado hasta el próximo tap en otro lado, así
+   que un botón recién pulsado queda resaltado como si el dedo siguiera ahí. */
+@custom-variant hover-fino (@media (hover: hover) and (pointer: fine));
 
 @layer base {
   html {
@@ -73,9 +94,46 @@
 @layer components {
   /* Entrada por desvanecido puro: sin desplazamiento, solo opacidad.
      `backwards` mantiene el estado inicial durante el retraso: sin eso el
-     elemento parpadea visible antes de arrancar. */
+     elemento parpadea visible antes de arrancar.
+
+     Baja de 1.1s a 420ms. Un segundo largo para que aparezca una pantalla de
+     login es tiempo mirando cómo algo se dibuja, y el personal entra todos
+     los días. Sigue siendo más lenta que un control porque es una portada,
+     no una respuesta a un click. */
   .entra {
-    animation: entrar 1.1s ease-out backwards;
+    animation: entrar 420ms var(--ease-salida) backwards;
+  }
+
+  /* Único hundido al pulsar del sistema: los botones, los enlaces del navbar
+     y las filas seleccionables de las listas. La confirmación de que el click
+     se registró tiene que llegar antes que la respuesta del servidor.
+
+     Sutil a propósito: por debajo de 0.95 se lee como un salto.
+
+     Se escribe con `transform` y no con la utilidad `scale-*` de Tailwind
+     porque esa usa la propiedad `scale`, independiente de `transform`.
+     Teniendo las dos, competían con la misma especificidad y ganaba la que la
+     hoja emitiera última.
+
+     La transición la declara cada elemento en su propia lista de propiedades;
+     acá solo va el estado, para no pisar transiciones de color con una
+     declaración más específica. */
+  .pulsable {
+    transition: transform 140ms var(--ease-salida);
+  }
+
+  .pulsable:active {
+    transform: scale(0.97);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pulsable {
+      transition: none;
+    }
+
+    .pulsable:active {
+      transform: none;
+    }
   }
 
   @keyframes entrar {
@@ -87,11 +145,14 @@
     }
   }
 
-  /* Quien pidió menos movimiento en su sistema lo pidió en serio: mareos y
-     vértigo son motivos frecuentes. El contenido se muestra igual, quieto. */
+  /* Menos movimiento no es cero animación: lo que marea es el desplazamiento,
+     no un cambio de opacidad. Como `entra` solo desvanece, se conserva —
+     acortada— en vez de suprimirla. Si alguna vez se le suma traslación o
+     escala, eso sí tiene que quedar afuera de este bloque. */
   @media (prefers-reduced-motion: reduce) {
     .entra {
-      animation: none;
+      animation-duration: 200ms;
+      animation-delay: 0ms;
     }
   }
 
