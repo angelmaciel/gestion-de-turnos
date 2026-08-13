@@ -8,13 +8,8 @@ import { cn } from '../../lib/cn';
   luchar contra estilos que no se ven.
 */
 
-/*
-  Los `hover:` van detrás de `hover-fino:`, una variante propia que exige
-  puntero de verdad (ver index.css). En una tablet el tap dispara `:hover` y
-  el color queda pegado después de soltar, como si el botón siguiera bajo el
-  dedo. En mesa de entrada, que puede trabajar con tablet, eso deja media
-  pantalla con controles falsamente resaltados.
-*/
+// `hover-fino:` exige puntero real (ver index.css): en tablet el tap dispara
+// :hover y lo deja pegado, como si el dedo siguiera sobre el control.
 const VARIANTES_BOTON = {
   primary: 'bg-accent text-white hover-fino:hover:bg-accent-hover',
   secondary: 'bg-surface text-ink border border-line-strong hover-fino:hover:bg-canvas',
@@ -72,25 +67,13 @@ export function Button({
       aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-control font-medium',
-        // Propiedades enumeradas y no `transition-all`: `all` incluye layout,
-        // que no se puede acelerar por GPU y ademas anima cosas que nadie
-        // pidio, como el ancho al cambiar el texto del boton.
-        //
-        // `scale` va aparte de `transform` porque Tailwind 4 implementa
-        // `scale-*` con la propiedad `scale` independiente. Declarando solo
-        // `transform`, el hundido al pulsar saltaba de golpe: la transicion
-        // no alcanzaba a la propiedad que realmente cambia.
+        // Enumeradas y no `transition-all`, que incluye layout. `scale` va
+        // aparte de `transform`: Tailwind 4 usa una propiedad independiente.
         'transition-[background-color,color,border-color,filter,transform,scale]',
-        // 140ms: por debajo de 300ms, que es el techo de lo que se siente
-        // inmediato. Un pulsado mas largo se percibe como demora del sistema.
+        // Bajo 300ms, que es el techo de lo que se siente inmediato.
         'duration-140 ease-salida',
-        // El hundido al pulsar sale de `.pulsable` (index.css) y no de
-        // `active:scale-*`. Tener las dos implementaciones era un choque:
-        // Tailwind escribe la propiedad `scale` y `.pulsable` escribe
-        // `transform`, las dos con la misma especificidad, y ganaba la que la
-        // hoja emitiera ultima. Con una sola, el navbar, las filas de
-        // preconsulta y los botones se hunden igual y respetan la misma regla
-        // de movimiento reducido.
+        // El hundido al pulsar sale de `.pulsable` (index.css), unico del
+        // sistema: tenerlo tambien acá chocaba a igual especificidad.
         'pulsable',
         'disabled:pointer-events-none disabled:opacity-50',
         VARIANTES_BOTON[variant],
@@ -131,12 +114,11 @@ export function CardBody({ className, ...props }) {
 }
 
 /**
- * Campo de formulario con su etiqueta y, si corresponde, el motivo por el que
- * quedó mal.
+ * Campo con su etiqueta y, si corresponde, el motivo por el que quedó mal.
  *
- * El mensaje de error toma el id `<htmlFor>-error` para que el control lo
- * referencie con `aria-describedby`: sin esa relación, un lector de pantalla
- * anuncia el campo sin decir qué tiene de malo.
+ * El error toma el id `<htmlFor>-error` para que el control lo referencie con
+ * `aria-describedby`; sin eso, un lector de pantalla anuncia el campo sin
+ * decir qué tiene de malo.
  */
 export function Field({ label, hint, error, htmlFor, children, className }) {
   return (
@@ -145,8 +127,7 @@ export function Field({ label, hint, error, htmlFor, children, className }) {
         {label}
       </label>
       {children}
-      {/* El error reemplaza a la pista y no se suma: repetir cómo había que
-          completar el campo compite con el mensaje que hay que leer ahora. */}
+      {/* El error reemplaza a la pista: repetirla compite con el mensaje. */}
       {error ? (
         <p id={htmlFor ? `${htmlFor}-error` : undefined} className="text-xs text-critical">
           {error}

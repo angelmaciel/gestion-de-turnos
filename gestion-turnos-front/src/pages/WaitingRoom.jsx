@@ -155,15 +155,9 @@ export function WaitingRoom() {
 
     channel.listen('.paciente.llamado', (e) => {
       setCurrentCall(e);
-      /*
-        Solo avanza con el evento en vivo, nunca al cargar la página: al
-        arrancar el televisor no hay nada que anunciar, y una pantalla que
-        parpadea sola cada vez que alguien la enciende o recarga entrena a
-        ignorarla.
-
-        Es un contador y no el número de turno porque volver a llamar al mismo
-        paciente tiene que anunciarse de nuevo, y el turno no cambia.
-      */
+      // Solo avanza con el evento en vivo, nunca al cargar: una pantalla que
+      // parpadea al encenderla entrena a ignorarla. Es contador y no número
+      // de turno porque rellamar al mismo paciente debe anunciarse igual.
       setLlamado((n) => n + 1);
       // La tabla muestra 8 filas: entran sin scroll en una pantalla de TV.
       setHistory((prev) => [e, ...prev].slice(0, 8));
@@ -196,17 +190,16 @@ export function WaitingRoom() {
     : history;
 
   /*
-    Alto exacto de la pantalla y sin scroll posible: es un televisor colgado en
-    la pared, nadie va a deslizar para ver el resto. Con `min-h-screen` el
-    contenido podía pasarse del alto —a 1366x768 se iba 48px— y esa franja
-    quedaba invisible para siempre.
+    Alto exacto de la pantalla: en un televisor colgado nadie desliza, así que
+    lo que se pase del alto queda invisible para siempre. El relleno, la
+    separación y la tipografía se achican en pantallas de poco alto, y los
+    `clamp` miran `min(vw, vh)` para responder al lado más chico.
 
-    El relleno, la separación y la tipografía se achican en pantallas de poco
-    alto, que es de donde salía el desborde. Los `clamp` miran `min(vw, vh)`
-    para que el texto responda al lado más chico y no solo al ancho.
+    Por debajo de `lg` el layout se apila y ahí sí se permite scroll, porque
+    recortar sería peor.
   */
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-950 p-4 text-white 2xl:p-6">
+    <div className="flex h-screen flex-col overflow-y-auto bg-slate-950 p-4 text-white lg:overflow-hidden 2xl:p-6">
       <header className="relative mb-3 2xl:mb-5">
         {/* Único indicador que queda: un punto de estado para que el personal
             sepa si la pantalla sigue recibiendo llamados. No es un control. */}
@@ -256,8 +249,7 @@ export function WaitingRoom() {
               Último paciente llamado
             </h2>
             {currentCall && (
-              /* Era text-sm: ilegible en un televisor a varios metros, y es
-                 parte del anuncio, no una etiqueta de interfaz. */
+              /* Parte del anuncio, no una etiqueta de interfaz. */
               <span className="tabular rounded-md bg-teal-700 px-3.5 py-1.5 text-2xl font-semibold uppercase">
                 Turno {currentCall.turno}
               </span>
@@ -267,31 +259,19 @@ export function WaitingRoom() {
           {currentCall ? (
             /*
               Un desvanecido corto y nada más: sin desplazamiento ni escala.
-
-              Esta pantalla se mira de lejos, de reojo y durante horas. Todo
-              lo que se mueva de más acá cansa mucho antes que en una pantalla
-              de trabajo, y el anuncio ya tiene el tono y la voz para llamar
-              la atención: el movimiento solo acompaña el cambio para que no
-              aparezca de golpe.
-
-              La `key` es el contador de llamados y no el turno, porque volver
-              a llamar al mismo paciente tiene que anunciarse igual.
+              Se mira de lejos y durante horas, así que todo lo que se mueva de
+              más cansa antes que en una pantalla de trabajo, y el anuncio ya
+              tiene tono y voz para llamar la atención.
             */
             <div key={llamado} className="entra flex flex-1 flex-col justify-center gap-4 2xl:gap-7">
               <div>
                 <p className="text-base font-medium tracking-[0.15em] text-slate-400 uppercase">
                   Paciente
                 </p>
-                {/*
-                  Escala con el ancho del televisor en vez de un tamaño fijo:
-                  la misma pantalla se cuelga en salas distintas y se mira
-                  desde distancias distintas. El `clamp` pone piso para que no
-                  se achique en un monitor chico y techo para que un nombre
-                  largo no se coma la pantalla.
-
-                  `break-words` porque los nombres compuestos no entran en una
-                  línea a este tamaño, y cortar es preferible a desbordar.
-                */}
+                {/* Escala con la pantalla: la misma se cuelga en salas
+                    distintas y se mira desde distancias distintas. El clamp
+                    pone piso y techo; `break-words`, porque un nombre
+                    compuesto no entra en una línea a este tamaño. */}
                 <p className="mt-1 text-[clamp(2.75rem,min(8vw,10vh),7.5rem)] leading-[1.05] font-bold break-words text-white uppercase">
                   {currentCall.paciente}
                 </p>

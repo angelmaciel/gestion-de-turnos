@@ -13,18 +13,11 @@ const FORMULARIO_VACIO = { patient_dni: '', patient_name: '', specialty_id: '' }
 /*
   Reglas del cliente, espejo de las de StoreAppointmentRequest.
 
-  El campo sigue sin dejar escribir lo que el backend va a rechazar, pero
-  ahora lo dice. Descartar el caracter en silencio era peor que no filtrar:
-  la tecla no respondía y no había forma de saber por qué, y de paso el
-  mensaje bajo el campo no llegaba a aparecer nunca, porque el error que lo
-  dispara jamás salía del navegador.
+  `filtro` limpia lo que se tipea o se pega, `rechazo` explica qué se descartó
+  —descartarlo en silencio deja la tecla sin responder y sin motivo— y
+  `exigir` es la comprobación al salir del campo y al enviar.
 
-  `filtro` limpia lo que se tipea o se pega, `rechazo` explica qué se
-  descartó, y `exigir` es la comprobación al salir del campo y al enviar.
-
-  El nombre conserva acentos y ñ (\p{L}), las tildes que algunos teclados
-  mandan como caracter combinante (\p{M}), y los apóstrofos y guiones de
-  "D'Angelo" o "García-Ruiz". Pegar "1.234.567" en la cédula deja "1234567".
+  El nombre conserva acentos y ñ (\p{L}) y las tildes combinantes (\p{M}).
 */
 const REGLAS = {
   patient_dni: {
@@ -52,10 +45,8 @@ export function Reception() {
 
   const [especialidades, setEspecialidades] = useState([]);
   const [cargandoEspecialidades, setCargandoEspecialidades] = useState(true);
-  // Va aparte del aviso de envío: si las especialidades no cargaron, el select
-  // queda vacío y esa explicación tiene que sobrevivir a cada intento de alta.
-  // Compartiendo estado, el primer submit la borraba y el campo se quedaba sin
-  // opciones y sin motivo a la vista.
+  // Aparte del aviso de envío: si las especialidades no cargaron, el select
+  // queda vacío y esa explicación tiene que sobrevivir a cada intento.
   const [errorEspecialidades, setErrorEspecialidades] = useState('');
   const [enviando, setEnviando] = useState(false);
 
@@ -102,9 +93,8 @@ export function Reception() {
     setForm((actual) => ({ ...actual, [campo]: value }));
     setAvisoEnvio('');
 
-    // Si el filtro descartó algo, el campo lo dice en vez de tragárselo. Un
-    // error viejo al lado de un campo que ya se está corrigiendo miente sobre
-    // el estado actual, así que en cualquier otro caso se limpia.
+    // Si el filtro descartó algo, el campo lo dice. En cualquier otro caso se
+    // limpia: un error viejo miente sobre el estado actual.
     marcar(campo, value === tecleado ? '' : REGLAS[campo].rechazo);
   };
 
@@ -122,13 +112,9 @@ export function Reception() {
 
     setAvisoEnvio('');
 
-    /*
-      El formulario lleva `noValidate`: la comprobación de obligatorios la hace
-      esta función y no el navegador. El globo nativo aparece de a uno, se va
-      solo a los pocos segundos, no lo lee `aria-describedby` y se dibuja con
-      un estilo que no es el del resto. Teniendo mensajes por campo, tener dos
-      formas distintas de decir lo mismo sobra.
-    */
+    // El formulario lleva `noValidate`: el globo nativo aparece de a uno, se
+    // va solo, no lo lee `aria-describedby` y usa otro estilo. Con mensajes
+    // por campo, dos formas de decir lo mismo sobran.
     const faltantes = {};
 
     for (const campo of CAMPOS) {
@@ -217,10 +203,8 @@ export function Reception() {
           </Alert>
         )}
 
-        {/* El número de turno es lo que hay que decirle al paciente en voz
-            alta, así que se muestra grande y en cifras tabulares, no dentro de
-            una oración. Queda arriba del formulario —que ya se vació— porque
-            ahí es donde vuelve la vista después de enviar. */}
+        {/* El número es lo que se le dice al paciente en voz alta: va grande,
+            en cifras tabulares y arriba, donde vuelve la vista al enviar. */}
         {ultimoTurno && (
           <Card role="status" className="mb-4 border-positive/30 bg-positive-soft">
             <CardBody className="flex items-center gap-4">
@@ -243,12 +227,10 @@ export function Reception() {
           <CardHeader title="Nuevo turno" description="Los tres datos son obligatorios." />
           <CardBody>
             <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-              {/* Arriba y no debajo del botón: después de enviar, la vista
-                  queda en el formulario y un aviso al pie pasa desapercibido. */}
+              {/* Arriba: al pie, después de enviar, pasa desapercibido. */}
               {avisoEnvio && <Alert tone="critical">{avisoEnvio}</Alert>}
 
-              {/* Durante el envío el formulario entero queda inerte: editar un
-                  campo cuya petición ya salió no cambia el resultado. */}
+              {/* Inerte mientras envía: editar algo ya enviado no cambia nada. */}
               <fieldset disabled={enviando} className="space-y-5">
                 <Field label="Cédula de identidad" htmlFor="cedula" error={errores.patient_dni}>
                   <Input
