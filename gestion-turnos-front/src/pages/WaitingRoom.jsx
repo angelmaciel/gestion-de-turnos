@@ -116,6 +116,10 @@ export function WaitingRoom() {
   const [currentCall, setCurrentCall] = useState(null);
   const [history, setHistory] = useState([]);
   const [connected, setConnected] = useState(false);
+  // Cuántos llamados llegaron en vivo desde que la pantalla está abierta.
+  // Sirve de `key` del bloque del anuncio: al cambiar, React lo vuelve a
+  // montar y el desvanecido corre de nuevo.
+  const [llamado, setLlamado] = useState(0);
   const [audioListo, setAudioListo] = useState(false);
 
   // Los navegadores bloquean audio y voz hasta que hay una interacción del
@@ -151,6 +155,16 @@ export function WaitingRoom() {
 
     channel.listen('.paciente.llamado', (e) => {
       setCurrentCall(e);
+      /*
+        Solo avanza con el evento en vivo, nunca al cargar la página: al
+        arrancar el televisor no hay nada que anunciar, y una pantalla que
+        parpadea sola cada vez que alguien la enciende o recarga entrena a
+        ignorarla.
+
+        Es un contador y no el número de turno porque volver a llamar al mismo
+        paciente tiene que anunciarse de nuevo, y el turno no cambia.
+      */
+      setLlamado((n) => n + 1);
       // La tabla muestra 8 filas: entran sin scroll en una pantalla de TV.
       setHistory((prev) => [e, ...prev].slice(0, 8));
 
@@ -181,9 +195,19 @@ export function WaitingRoom() {
     ? [currentCall, ...history.filter((h) => h.appointment_id !== currentCall.appointment_id)]
     : history;
 
+  /*
+    Alto exacto de la pantalla y sin scroll posible: es un televisor colgado en
+    la pared, nadie va a deslizar para ver el resto. Con `min-h-screen` el
+    contenido podía pasarse del alto —a 1366x768 se iba 48px— y esa franja
+    quedaba invisible para siempre.
+
+    El relleno, la separación y la tipografía se achican en pantallas de poco
+    alto, que es de donde salía el desborde. Los `clamp` miran `min(vw, vh)`
+    para que el texto responda al lado más chico y no solo al ancho.
+  */
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 p-6 text-white">
-      <header className="relative mb-5">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-950 p-4 text-white 2xl:p-6">
+      <header className="relative mb-3 2xl:mb-5">
         {/* Único indicador que queda: un punto de estado para que el personal
             sepa si la pantalla sigue recibiendo llamados. No es un control. */}
         <span
@@ -195,7 +219,7 @@ export function WaitingRoom() {
 
         {/* Franja de aviso: lo primero que mira el paciente al entrar. */}
         <div className="rounded-xl bg-teal-700 py-3 text-center">
-          <h1 className="text-2xl font-semibold tracking-wide text-white">
+          <h1 className="text-3xl font-semibold tracking-wide text-white uppercase">
             Favor atienda la pantalla
           </h1>
         </div>
@@ -210,54 +234,87 @@ export function WaitingRoom() {
           onClick={desbloquearAudio}
           className="fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center gap-3 bg-slate-950/95 text-center"
         >
-          <span className="text-3xl font-semibold text-white">Tocá para activar el sonido</span>
-          <span className="text-lg text-slate-400">
+          <span className="text-3xl font-semibold text-white uppercase">
+            Tocá para activar el sonido
+          </span>
+          <span className="text-lg text-slate-400 uppercase">
             Se hace una sola vez al encender la pantalla.
           </span>
         </button>
       )}
 
-      <div className="grid flex-1 gap-5 lg:grid-cols-[5fr_7fr]">
+      {/* 60/40 a favor del último llamado: es el dato que la persona necesita
+          ahora, y la lista de la derecha solo sirve para reubicarse si se
+          perdió el anuncio. Estaba al revés (5fr/7fr, o sea 42/58). */}
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] 2xl:gap-5">
 
         {/* Último llamado: los tres datos apilados, cada uno con su etiqueta.
             Es lo que el paciente tiene que poder leer desde el fondo de la sala. */}
-        <section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <div className="mb-5 flex items-center justify-between border-b border-slate-800 pb-3">
+        <section className="flex min-h-0 flex-col rounded-xl border border-slate-800 bg-slate-900 p-4 2xl:p-6">
+          <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-3 2xl:mb-5">
             <h2 className="text-sm font-medium tracking-wider text-slate-400 uppercase">
               Último paciente llamado
             </h2>
             {currentCall && (
-              <span className="tabular rounded-md bg-teal-700 px-2.5 py-1 text-sm font-semibold">
+              /* Era text-sm: ilegible en un televisor a varios metros, y es
+                 parte del anuncio, no una etiqueta de interfaz. */
+              <span className="tabular rounded-md bg-teal-700 px-3.5 py-1.5 text-2xl font-semibold uppercase">
                 Turno {currentCall.turno}
               </span>
             )}
           </div>
 
           {currentCall ? (
-            <div className="flex flex-1 flex-col justify-center gap-7">
+            /*
+              Un desvanecido corto y nada más: sin desplazamiento ni escala.
+
+              Esta pantalla se mira de lejos, de reojo y durante horas. Todo
+              lo que se mueva de más acá cansa mucho antes que en una pantalla
+              de trabajo, y el anuncio ya tiene el tono y la voz para llamar
+              la atención: el movimiento solo acompaña el cambio para que no
+              aparezca de golpe.
+
+              La `key` es el contador de llamados y no el turno, porque volver
+              a llamar al mismo paciente tiene que anunciarse igual.
+            */
+            <div key={llamado} className="entra flex flex-1 flex-col justify-center gap-4 2xl:gap-7">
               <div>
-                <p className="text-xs font-medium tracking-[0.15em] text-slate-500 uppercase">
+                <p className="text-base font-medium tracking-[0.15em] text-slate-400 uppercase">
                   Paciente
                 </p>
-                <p className="mt-1 text-5xl leading-tight font-bold text-white uppercase">
+                {/*
+                  Escala con el ancho del televisor en vez de un tamaño fijo:
+                  la misma pantalla se cuelga en salas distintas y se mira
+                  desde distancias distintas. El `clamp` pone piso para que no
+                  se achique en un monitor chico y techo para que un nombre
+                  largo no se coma la pantalla.
+
+                  `break-words` porque los nombres compuestos no entran en una
+                  línea a este tamaño, y cortar es preferible a desbordar.
+                */}
+                <p className="mt-1 text-[clamp(2.75rem,min(8vw,10vh),7.5rem)] leading-[1.05] font-bold break-words text-white uppercase">
                   {currentCall.paciente}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium tracking-[0.15em] text-slate-500 uppercase">
+                <p className="text-base font-medium tracking-[0.15em] text-slate-400 uppercase">
                   Consultorio
                 </p>
-                <p className="tabular mt-1 text-5xl font-bold text-amber-400 uppercase">
+                {/* Al mismo tamaño que el nombre: son los dos datos que la
+                    persona necesita, quién y adónde. */}
+                <p className="tabular mt-1 text-[clamp(2.75rem,min(8vw,10vh),7.5rem)] leading-[1.05] font-bold break-words text-amber-400 uppercase">
                   {currentCall.sala ?? 'Sin asignar'}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium tracking-[0.15em] text-slate-500 uppercase">
+                <p className="text-base font-medium tracking-[0.15em] text-slate-400 uppercase">
                   Profesional
                 </p>
-                <p className="mt-1 text-4xl leading-tight font-bold text-emerald-400 uppercase">
+                {/* Queda por debajo a propósito: es dato de contexto, no lo
+                    que hay que hacer. */}
+                <p className="mt-1 text-[clamp(1.75rem,min(4.5vw,5.5vh),4rem)] leading-tight font-bold break-words text-emerald-400 uppercase">
                   {currentCall.profesional ?? 'Sin asignar'}
                 </p>
               </div>
