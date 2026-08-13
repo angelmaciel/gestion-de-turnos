@@ -57,9 +57,22 @@ const REGLAS = {
     },
   },
   blood_pressure: {
+    // Solo dígitos y la barra: escribir "mmHg" o un guion se descarta al
+    // tipearlo, que es más rápido que enterarse al enviar.
+    filtro: (v) => v.replace(/[^\d/]/g, ''),
+    rechazo: 'La presión se escribe como 120/80: solo números y una barra.',
     exigir: (v) => {
       if (v.trim() === '') return 'Ingresá la presión arterial.';
-      if (v.length > 20) return 'La presión arterial no puede pasar de 20 caracteres.';
+      if (!/^\d{2,3}\/\d{2,3}$/.test(v)) {
+        return 'Escribí la presión como sistólica/diastólica, por ejemplo 120/80.';
+      }
+
+      const [sistolica, diastolica] = v.split('/').map(Number);
+      if (sistolica < 60 || sistolica > 300) return 'La sistólica debe estar entre 60 y 300.';
+      if (diastolica < 30 || diastolica > 200) return 'La diastólica debe estar entre 30 y 200.';
+      // Invertidas casi siempre son los dos números tipeados al revés.
+      if (diastolica >= sistolica) return 'La sistólica tiene que ser mayor que la diastólica.';
+
       return '';
     },
   },
@@ -99,11 +112,22 @@ export function Triage() {
 
   // Al salir del campo, no mientras se escribe: avisar a mitad de un número
   // que todavía se está tipeando es corregir antes de que haya un error.
-  const revisar = (campo, valor) => () => marcar(campo, REGLAS[campo].exigir(valor));
+  const revisar = (campo, valor) => () => {
+    // Un rechazo de tecleo ya explica lo suyo: pisarlo con "ingresá algo"
+    // borraría el motivo justo cuando se está por corregir.
+    if (errores[campo] === REGLAS[campo].rechazo) return;
+
+    marcar(campo, REGLAS[campo].exigir(valor));
+  };
 
   const editar = (campo, setter) => (e) => {
-    setter(e.target.value);
-    marcar(campo, '');
+    const tecleado = e.target.value;
+    const filtro = REGLAS[campo].filtro;
+    const valor = filtro ? filtro(tecleado) : tecleado;
+
+    setter(valor);
+    // Si el filtro descartó algo, el campo lo dice en vez de tragárselo.
+    marcar(campo, valor === tecleado ? '' : REGLAS[campo].rechazo);
   };
 
   /*
