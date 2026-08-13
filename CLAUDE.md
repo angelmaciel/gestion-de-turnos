@@ -22,10 +22,13 @@ Ver [README.md](README.md) para el flujo completo y las capturas, y
 Backend (desde `gestion-turnos-back/`):
 
 ```bash
-composer setup     # install + .env + key:generate + migrate + build
-composer dev       # serve + queue:listen + pail + vite, todo junto
+composer setup     # install + .env + key:generate + migrate
+composer dev       # serve + queue:listen + pail, todo junto
 composer test      # config:clear + artisan test
 ```
+
+El backend no compila nada de frontend: el SPA vive en `gestion-turnos-front/`
+y se construye desde ahí.
 
 Frontend (desde `gestion-turnos-front/`):
 
