@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import { Navbar } from '../components/Navbar';
 import { useColaEnVivo } from '../hooks/useColaEnVivo';
+import { motivoDelFallo } from '../lib/errores';
 import {
   Alert, Badge, Button, Card, CardBody, CardHeader,
   DataPoint, EmptyState, PageHeader,
@@ -13,19 +14,6 @@ function tonoImc(categoria) {
   if (categoria === 'Obesidad') return 'critical';
 
   return 'warning'; // Bajo peso o Sobrepeso
-}
-
-/*
-  Traduce un fallo de red o del servidor a algo que se pueda leer desde el
-  consultorio. Mismo criterio que en las otras pantallas: un 5xx o una caída
-  de red no son culpa de quien tocó el botón, y decirle "no se pudo" a secas
-  lo deja sin saber si reintentar sirve de algo.
-*/
-function motivoDelFallo(err, porDefecto) {
-  if (!err.response) return 'No se pudo establecer conexión con el servidor.';
-  if (err.response.status >= 500) return 'El servidor no está respondiendo. Probá de nuevo en unos minutos.';
-
-  return err.response.data?.message ?? porDefecto;
 }
 
 export function DoctorPanel() {
