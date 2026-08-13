@@ -28,11 +28,9 @@ const soloAlfanumerico = (v = '') => v.replace(/[^0-9a-z]/gi, '').toLowerCase();
 /*
   Reglas del cliente, espejo de las de CompletePreconsultaRequest.
 
-  Existen por el mismo motivo que en mesa de entrada: con `required`, `min` y
-  `max` nativos el navegador frena el envío con su propio globo, la petición
-  nunca sale y el mensaje por campo —que es el que este formulario dibuja— no
-  llega a mostrarse jamás. El formulario lleva `noValidate` y la comprobación
-  la hace esta tabla, así que hay una sola forma de decir que algo está mal.
+  El formulario lleva `noValidate`: con `required`, `min` y `max` nativos el
+  navegador frena el envío con su globo y el mensaje por campo no llega a
+  mostrarse. Así hay una sola forma de decir que algo está mal.
 
   El backend los acepta nulos; acá son obligatorios porque una preconsulta sin
   signos vitales no es una preconsulta.
@@ -131,19 +129,13 @@ export function Triage() {
   };
 
   /*
-    La animación de entrada la reciben solo las filas que acaban de aparecer:
-    la cola se refresca por WebSocket y cada 30 segundos, así que animarla
-    entera en cada refresco sería movimiento sin motivo varias veces por
-    minuto, en una pantalla que se mira todo el día.
+    Solo se anima la fila recién llegada: la cola se refresca por WebSocket y
+    cada 30 segundos, y animarla entera sería movimiento sin motivo.
 
-    `idsPrevios` es un ref porque cambiarlo no debe provocar un render, y se
-    lee únicamente dentro del efecto: consultarlo durante el pintado no es
-    seguro con render concurrente.
-
-    `nuevos` sí es estado, porque de él depende lo que se pinta. Se conserva
-    hasta que llegue la próxima tanda en vez de limpiarse enseguida: vaciarlo
-    justo después de pintar sacaría la clase a mitad de la animación y la
-    cortaría por la mitad.
+    `idsPrevios` es un ref y se lee solo dentro del efecto —durante el render
+    no es seguro con render concurrente—. `nuevos` es estado porque de él
+    depende lo que se pinta, y se conserva hasta la próxima tanda: vaciarlo al
+    pintar cortaría la animación por la mitad.
   */
   const idsPrevios = useRef(new Set());
   const [nuevos, setNuevos] = useState(() => new Set());
@@ -198,10 +190,8 @@ export function Triage() {
     setErrores({});
     setResultado(null);
 
-    // El foco salta al peso: elegir al paciente y empezar a tipear es un solo
-    // gesto, sin volver al mouse para picar el primer campo. Va en el efecto
-    // del siguiente pintado porque el formulario todavía no existe: hasta
-    // ahora la tarjeta mostraba el estado vacío.
+    // Elegir paciente y tipear pasa a ser un solo gesto. Va en el pintado
+    // siguiente porque el formulario todavía no existe.
     requestAnimationFrame(() => pesoRef.current?.focus());
   };
 
@@ -370,9 +360,8 @@ export function Triage() {
             <CardBody>
               {seleccionado ? (
                 <form onSubmit={confirmar} className="space-y-5" noValidate>
-                  {/* Vuelve a entrar cada vez que cambia el paciente: confirma
-                      que la tarjeta ahora habla de otra persona, que es el
-                      error mas caro posible en esta pantalla. */}
+                  {/* Vuelve a entrar al cambiar de paciente: confirma que la
+                      tarjeta ahora habla de otra persona. */}
                   <div key={seleccionado.id} className="entra-fila rounded-control bg-canvas px-4 py-3">
                     <p className="text-sm font-semibold">{seleccionado.patient?.nombre}</p>
                     <p className="mt-0.5 text-xs text-muted">
@@ -382,15 +371,11 @@ export function Triage() {
                     </p>
                   </div>
 
-                  {/* Inerte mientras la peticion viaja: cambiar una medicion ya
-                      enviada no cambia lo que se guardo. */}
+                  {/* Inerte mientras viaja la petición. */}
                   <fieldset disabled={guardando} className="space-y-5">
                     <div className="grid grid-cols-2 gap-4">
                       <Field label="Peso (kg)" htmlFor="peso" error={errores.weight}>
-                        {/* Sin `required`, `min` ni `max` nativos: los frenaba
-                            el navegador con su propio globo y el mensaje bajo
-                            el campo no llegaba a mostrarse. La comprobacion la
-                            hace REGLAS, espejo de la del backend. */}
+                        {/* Sin restricciones nativas: las comprueba REGLAS. */}
                         <Input
                           id="peso" ref={pesoRef} type="number" step="0.1" inputMode="decimal"
                           value={weight} onChange={editar('weight', setWeight)}

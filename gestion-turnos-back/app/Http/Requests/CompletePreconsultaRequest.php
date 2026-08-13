@@ -8,15 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class CompletePreconsultaRequest extends FormRequest
 {
-    /*
-      Sistólica/diastólica, como se escribe en la ficha: "120/80".
-
-      Antes la presión era un string libre de hasta 20 caracteres, asi que
-      "xx" entraba y quedaba guardado como signo vital. En una historia
-      clínica eso es peor que una cédula mal escrita: el dato se lee después
-      para decidir, y no hay forma de saber si fue un error de tipeo o una
-      medición real.
-    */
+    /** Sistólica/diastólica, como se escribe en la ficha: "120/80". */
     private const PATRON_PRESION = '/^\d{2,3}\/\d{2,3}$/';
 
     /** Límites amplios a propósito: descartan el disparate, no el caso raro. */
@@ -57,17 +49,13 @@ class CompletePreconsultaRequest extends FormRequest
     }
 
     /**
-     * Rangos fisiológicos, aparte del formato.
-     *
-     * El patrón solo garantiza dos números de dos o tres cifras, así que
-     * "999/999" lo pasaría. Va como regla propia y no como otro patrón porque
-     * comparar números con una expresión regular es ilegible.
+     * Rangos fisiológicos, aparte del formato: el patrón solo garantiza dos
+     * números de dos o tres cifras, así que "999/999" lo pasaría.
      */
     private function rangoDePresion(): Closure
     {
         return function (string $atributo, mixed $valor, Closure $fallar): void {
-            // Si el formato ya falló, su mensaje es el que corresponde: sumar
-            // otro solo apila ruido bajo el mismo campo.
+            // Si el formato ya falló, su mensaje es el que corresponde.
             if (! is_string($valor) || preg_match(self::PATRON_PRESION, $valor) !== 1) {
                 return;
             }
@@ -86,9 +74,8 @@ class CompletePreconsultaRequest extends FormRequest
                 return;
             }
 
-            // La sistólica es la presión durante el latido y la diastólica la
-            // del reposo entre latidos, así que la primera es siempre mayor.
-            // Invertidas casi siempre son los dos números tipeados al revés.
+            // La sistólica es siempre mayor; invertidas suelen ser un tipeo
+            // al revés.
             if ($diastolica >= $sistolica) {
                 $fallar('La sistólica tiene que ser mayor que la diastólica.');
             }
@@ -106,9 +93,8 @@ class CompletePreconsultaRequest extends FormRequest
     }
 
     /**
-     * El mensaje genérico de `regex` dice "el formato es inválido", que no
-     * explica cómo se escribe. Este es el texto que preconsulta lee bajo el
-     * campo mientras tiene al paciente enfrente.
+     * El genérico de `regex` no explica cómo se escribe, y este es el texto
+     * que se lee bajo el campo con el paciente enfrente.
      *
      * @return array<string, string>
      */
