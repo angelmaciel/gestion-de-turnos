@@ -126,6 +126,40 @@
     transform: scale(0.97);
   }
 
+  /* Entrada de una fila que acaba de aparecer en una cola en vivo.
+
+     La clase la pone solo la fila nueva, nunca las que ya estaban: la lista
+     se refresca por WebSocket y cada 30 segundos, así que animarla entera en
+     cada refresco sería movimiento sin motivo varias veces por minuto, justo
+     lo que hay que evitar en una pantalla que se mira todo el día.
+
+     El propósito acá sí es concreto: que un paciente aparezca de golpe en el
+     medio de la lista mientras se está leyendo es desconcertante. El
+     desplazamiento es mínimo y corto, lo justo para que el ojo registre que
+     algo entró y dónde. */
+  .entra-fila {
+    animation: entrar-fila 260ms var(--ease-salida) backwards;
+  }
+
+  @keyframes entrar-fila {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Se conserva el desvanecido, que no marea, y se quita la traslación. */
+  @media (prefers-reduced-motion: reduce) {
+    .entra-fila {
+      animation-name: entrar;
+      animation-duration: 200ms;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .pulsable {
       transition: none;
