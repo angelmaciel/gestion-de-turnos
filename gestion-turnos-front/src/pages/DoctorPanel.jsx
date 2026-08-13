@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import { Navbar } from '../components/Navbar';
 import { useColaEnVivo } from '../hooks/useColaEnVivo';
@@ -15,23 +15,49 @@ function tonoImc(categoria) {
   return 'warning'; // Bajo peso o Sobrepeso
 }
 
+/*
+  Traduce un fallo de red o del servidor a algo que se pueda leer desde el
+  consultorio. Mismo criterio que en las otras pantallas: un 5xx o una caída
+  de red no son culpa de quien tocó el botón, y decirle "no se pudo" a secas
+  lo deja sin saber si reintentar sirve de algo.
+*/
+function motivoDelFallo(err, porDefecto) {
+  if (!err.response) return 'No se pudo establecer conexión con el servidor.';
+  if (err.response.status >= 500) return 'El servidor no está respondiendo. Probá de nuevo en unos minutos.';
+
+  return err.response.data?.message ?? porDefecto;
+}
+
 export function DoctorPanel() {
   const [queue, setQueue] = useState([]);
   const [currentPatient, setCurrentPatient] = useState(null);
   const [mensaje, setMensaje] = useState(null);
+  // Aparte del resultado de cada acción: un usuario sin perfil profesional no
+  // puede hacer nada acá, y ese aviso no puede desaparecer porque después se
+  // haya intentado otra cosa. Compartiendo estado, el primer intento lo
+  // borraba y la pantalla quedaba vacía sin explicar por qué.
+  const [errorPerfil, setErrorPerfil] = useState('');
+
+  /*
+    Qué acción está viajando. Sirve para dos cosas a la vez: mostrar el
+    spinner en el botón correcto y bloquear el resto.
+
+    Sin esto, dos clicks seguidos en "Llamar" mandaban dos peticiones. Llamar
+    incrementa `attempts` en el backend, asi que el contador de llamados
+    quedaba inflado y el altavoz cantaba el mismo turno dos veces.
+  */
+  const [enVuelo, setEnVuelo] = useState(null);
 
   // 1. Cargar cola de espera (status = 'preconsulta_completa')
   const fetchQueue = async () => {
     try {
       const res = await api.get('/profesional/cola');
       setQueue(Array.isArray(res.data) ? res.data : (res.data.data ?? []));
+      setErrorPerfil('');
     } catch (err) {
       console.error('Error al obtener la cola de espera:', err);
       if (err.response?.status === 403) {
-        setMensaje({
-          tono: 'critical',
-          texto: 'Tu usuario no tiene un perfil de profesional configurado.',
-        });
+        setErrorPerfil('Tu usuario no tiene un perfil de profesional configurado.');
       }
     }
   };
@@ -46,8 +72,32 @@ export function DoctorPanel() {
   // o cuando otro profesional de la especialidad toma un turno.
   useColaEnVivo(fetchQueue);
 
+  /*
+    La animación de entrada la reciben solo los turnos que acaban de aparecer.
+    La cola se refresca por WebSocket y cada 30 segundos: animarla entera en
+    cada refresco sería movimiento sin motivo varias veces por minuto, en una
+    pantalla que queda abierta toda la jornada.
+
+    Acá importa más que en preconsulta, porque el profesional no está mirando
+    la lista: trabaja con el paciente enfrente y la consulta de reojo. Que la
+    fila nueva se anuncie sola es la diferencia entre notarla y no.
+  */
+  const idsPrevios = useRef(new Set());
+  const [nuevos, setNuevos] = useState(() => new Set());
+
+  useEffect(() => {
+    const actuales = new Set(queue.map((item) => item.id));
+    const llegaron = [...actuales].filter((id) => !idsPrevios.current.has(id));
+
+    idsPrevios.current = actuales;
+
+    if (llegaron.length > 0) setNuevos(new Set(llegaron));
+  }, [queue]);
+
   // 2. Llamar a un paciente concreto, o al primero de la cola si no se indica uno.
-  const handleCallPatient = async (targetPatient = null) => {
+  const handleCallPatient = async (targetPatient = null, etiqueta = 'siguiente') => {
+    if (enVuelo) return;
+
     setMensaje(null);
     const patientToCall = targetPatient ?? queue[0];
 
@@ -56,6 +106,8 @@ export function DoctorPanel() {
 
       return;
     }
+
+    setEnVuelo(etiqueta);
 
     try {
       const res = await api.post(`/profesional/turnos/${patientToCall.id}/call`);
@@ -67,60 +119,59 @@ export function DoctorPanel() {
       fetchQueue();
     } catch (err) {
       console.error('Error al llamar al paciente:', err);
-      setMensaje({
-        tono: 'critical',
-        texto: err.response?.data?.message ?? 'No se pudo llamar al paciente.',
-      });
+      setMensaje({ tono: 'critical', texto: motivoDelFallo(err, 'No se pudo llamar al paciente.') });
+    } finally {
+      setEnVuelo(null);
     }
   };
 
   // 3. Re-llamar al paciente actual (incrementa 'attempts' en backend)
-  const recallCurrent = async () => {
+  const recallCurrent = () => {
     if (!currentPatient) return;
-    await handleCallPatient(currentPatient);
+
+    return handleCallPatient(currentPatient, 'rellamar');
+  };
+
+  /*
+    Cierre del turno actual, atendido o ausente. Las dos acciones difieren en
+    la ruta, el tono y el texto, asi que compartir el cuerpo evita que una se
+    arregle y la otra quede atrás.
+  */
+  const cerrarTurno = async ({ ruta, etiqueta, tono, texto, siFalla }) => {
+    if (!currentPatient || enVuelo) return;
+
+    setEnVuelo(etiqueta);
+
+    try {
+      await api.post(`/profesional/turnos/${currentPatient.id}/${ruta}`);
+      setMensaje({ tono, texto: texto(currentPatient) });
+      setCurrentPatient(null);
+      fetchQueue();
+    } catch (err) {
+      console.error(`Error al ${etiqueta}:`, err);
+      setMensaje({ tono: 'critical', texto: motivoDelFallo(err, siFalla) });
+    } finally {
+      setEnVuelo(null);
+    }
   };
 
   // 4. Marcar como Atendido (status -> 'atendido')
-  const markAsAttended = async () => {
-    if (!currentPatient) return;
-
-    try {
-      await api.post(`/profesional/turnos/${currentPatient.id}/attend`);
-      setMensaje({
-        tono: 'positive',
-        texto: `Consulta finalizada para el turno ${currentPatient.turno}.`,
-      });
-      setCurrentPatient(null);
-      fetchQueue();
-    } catch (err) {
-      console.error('Error al finalizar atención:', err);
-      setMensaje({
-        tono: 'critical',
-        texto: err.response?.data?.message ?? 'No se pudo finalizar la atención.',
-      });
-    }
-  };
+  const markAsAttended = () => cerrarTurno({
+    ruta: 'attend',
+    etiqueta: 'finalizar',
+    tono: 'positive',
+    texto: (p) => `Consulta finalizada para el turno ${p.turno}.`,
+    siFalla: 'No se pudo finalizar la atención.',
+  });
 
   // 5. Marcar como Ausente (status -> 'ausente')
-  const markAsAbsent = async () => {
-    if (!currentPatient) return;
-
-    try {
-      await api.post(`/profesional/turnos/${currentPatient.id}/absent`);
-      setMensaje({
-        tono: 'warning',
-        texto: `Turno ${currentPatient.turno} marcado como ausente.`,
-      });
-      setCurrentPatient(null);
-      fetchQueue();
-    } catch (err) {
-      console.error('Error al marcar ausente:', err);
-      setMensaje({
-        tono: 'critical',
-        texto: err.response?.data?.message ?? 'No se pudo marcar como ausente.',
-      });
-    }
-  };
+  const markAsAbsent = () => cerrarTurno({
+    ruta: 'absent',
+    etiqueta: 'ausente',
+    tono: 'warning',
+    texto: (p) => `Turno ${p.turno} marcado como ausente.`,
+    siFalla: 'No se pudo marcar como ausente.',
+  });
 
   return (
     <>
@@ -128,13 +179,17 @@ export function DoctorPanel() {
       <main className="mx-auto max-w-4xl px-6 py-8">
         <PageHeader title="Consultorio" description="Llamá y atendé a los pacientes de tu especialidad." />
 
+        {errorPerfil && <Alert tone="critical" className="mb-6">{errorPerfil}</Alert>}
         {mensaje && <Alert tone={mensaje.tono} className="mb-6">{mensaje.texto}</Alert>}
 
         <Card className="mb-6">
           <CardHeader title="En consultorio" />
           <CardBody>
             {currentPatient ? (
-              <div className="space-y-5">
+              // La ficha vuelve a entrar cada vez que cambia el turno: llamar
+              // al paciente equivocado es el error más caro de esta pantalla,
+              // y el movimiento confirma que ahora habla de otra persona.
+              <div key={currentPatient.id} className="entra-fila space-y-5">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                   <span className="tabular text-4xl font-semibold text-accent">
                     {currentPatient.turno}
@@ -173,15 +228,28 @@ export function DoctorPanel() {
                   <DataPoint label="Llamados" value={currentPatient.attempts ?? 0} />
                 </dl>
 
+                {/* Cada botón muestra su propio spinner, pero mientras algo
+                    viaja se bloquean los tres: finalizar y marcar ausente son
+                    cierres distintos del mismo turno y no pueden salir a la
+                    vez. */}
                 <div className="flex flex-wrap gap-3">
-                  <Button variant="secondary" onClick={recallCurrent} className="flex-1">
-                    Volver a llamar
+                  <Button
+                    variant="secondary" onClick={recallCurrent} className="flex-1"
+                    loading={enVuelo === 'rellamar'} disabled={Boolean(enVuelo)}
+                  >
+                    {enVuelo === 'rellamar' ? 'Llamando…' : 'Volver a llamar'}
                   </Button>
-                  <Button variant="positive" onClick={markAsAttended} className="flex-1">
-                    Finalizar
+                  <Button
+                    variant="positive" onClick={markAsAttended} className="flex-1"
+                    loading={enVuelo === 'finalizar'} disabled={Boolean(enVuelo)}
+                  >
+                    {enVuelo === 'finalizar' ? 'Finalizando…' : 'Finalizar'}
                   </Button>
-                  <Button variant="critical" onClick={markAsAbsent} className="flex-1">
-                    Ausente
+                  <Button
+                    variant="critical" onClick={markAsAbsent} className="flex-1"
+                    loading={enVuelo === 'ausente'} disabled={Boolean(enVuelo)}
+                  >
+                    {enVuelo === 'ausente' ? 'Marcando…' : 'Ausente'}
                   </Button>
                 </div>
               </div>
@@ -191,9 +259,10 @@ export function DoctorPanel() {
                 <Button
                   size="lg"
                   onClick={() => handleCallPatient(null)}
-                  disabled={queue.length === 0}
+                  loading={enVuelo === 'siguiente'}
+                  disabled={queue.length === 0 || Boolean(enVuelo)}
                 >
-                  Llamar siguiente
+                  {enVuelo === 'siguiente' ? 'Llamando…' : 'Llamar siguiente'}
                 </Button>
               </div>
             )}
@@ -208,7 +277,10 @@ export function DoctorPanel() {
             ) : (
               <ul className="divide-y divide-line">
                 {queue.map((item) => (
-                  <li key={item.id} className="flex items-center gap-4 px-5 py-3">
+                  <li
+                    key={item.id}
+                    className={`flex items-center gap-4 px-5 py-3 ${nuevos.has(item.id) ? 'entra-fila' : ''}`}
+                  >
                     <span className="tabular w-10 shrink-0 text-sm font-semibold text-muted">
                       {item.turno}
                     </span>
@@ -226,7 +298,12 @@ export function DoctorPanel() {
                       </p>
                     </div>
 
-                    <Button variant="secondary" size="sm" onClick={() => handleCallPatient(item)}>
+                    <Button
+                      variant="secondary" size="sm"
+                      onClick={() => handleCallPatient(item, `fila-${item.id}`)}
+                      loading={enVuelo === `fila-${item.id}`}
+                      disabled={Boolean(enVuelo)}
+                    >
                       Llamar
                     </Button>
                   </li>
