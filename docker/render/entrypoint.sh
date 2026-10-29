@@ -23,7 +23,9 @@ php artisan db:seed --force
 # www-data. Se re-aplica acá, ya con todo lo que el arranque pudo crear.
 chown -R www-data:www-data storage bootstrap/cache database
 
-: "${PORT:=10000}"
+# Render siempre define PORT. Fuera de Render (Docker local, CI) hay que
+# exportar el valor por defecto: envsubst solo ve variables de entorno.
+export PORT="${PORT:-10000}"
 envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
 
 php-fpm -D

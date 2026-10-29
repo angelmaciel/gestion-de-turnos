@@ -38,10 +38,16 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
+            // Sin estos tres, dos altas de turno simultáneas chocan y la segunda
+            // falla al instante con "database is locked" (lo encontró la prueba
+            // de carga de qa/jmeter). WAL deja leer mientras se escribe,
+            // busy_timeout hace esperar en vez de fallar, e IMMEDIATE toma el
+            // bloqueo de escritura al empezar la transacción, donde la espera
+            // sí funciona (una DEFERRED que sube a escritura falla sin esperar).
+            'busy_timeout' => (int) env('DB_BUSY_TIMEOUT', 5000),
+            'journal_mode' => env('DB_JOURNAL_MODE', 'wal'),
+            'synchronous' => env('DB_SYNCHRONOUS', 'normal'),
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

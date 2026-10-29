@@ -73,3 +73,59 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  api:
+    name: API (Newman · JMeter)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # La misma imagen que se publica en Render: SQLite, sin Redis, se siembra
+      # sola al arrancar con los usuarios de ejemplo.
+      - name: Construir la imagen de la app
+        run: docker build -t gestion-turnos-qa .
+
+      - name: Levantar la app con los límites de producción
+        run: |
+          docker network create qa-net
+          docker run -d --name turnos-qa --network qa-net -p 10000:10000 \
+            -e BROADCAST_CONNECTION=log -e SESSION_SECURE_COOKIE=false gestion-turnos-qa
+          timeout 90 sh -c 'until curl -sf http://localhost:10000/up > /dev/null; do sleep 2; done'
+
+      - name: Pruebas de API (Postman con Newman)
+        run: |
+          npx -y -p newman@6.2.1 -p newman-reporter-htmlextra@1.23.1 newman run \
+            qa/postman/gestion-turnos.postman_collection.json \
+            -e qa/postman/local.postman_environment.json \
+            --reporters cli,junit,htmlextra \
+            --reporter-junit-export qa/resultados/newman.xml \
+            --reporter-htmlextra-export qa/resultados/newman.html
+
+      # Todos los usuarios virtuales salen de una misma IP: con los límites de
+      # producción la prueba mediría el limitador, no la app (ver config/limites.php).
+      - name: Reiniciar la app con límites altos para la carga
+        run: |
+          docker rm -f turnos-qa
+          docker run -d --name turnos-qa --network qa-net -p 10000:10000 \
+            -e BROADCAST_CONNECTION=log -e SESSION_SECURE_COOKIE=false \
+            -e RATE_LIMIT_LOGIN=10000 -e RATE_LIMIT_LOGIN_IP=10000 \
+            -e RATE_LIMIT_API=1000000 -e RATE_LIMIT_PUBLICO=1000000 gestion-turnos-qa
+          timeout 90 sh -c 'until curl -sf http://localhost:10000/up > /dev/null; do sleep 2; done'
+
+      - name: Prueba de carga (JMeter, 50 usuarios durante 60 s)
+        run: |
+          mkdir -p qa/resultados
+          docker run --rm --network qa-net -v "$PWD/qa/jmeter:/plan:ro" -v "$PWD/qa/resultados:/out" \
+            alpine/jmeter:5.6.3@sha256:0f08fe396259787ad5c8970548f16bd3698d1e96d87056565336fbc005f6c5f2 \
+            -n -t /plan/jornada.jmx -Jhost=turnos-qa -Jusuarios=10 -Jrampa=10 -Jduracion=60 \
+            -l /out/jmeter.jtl -e -o /out/jmeter
+
+      - name: Umbrales de la carga (P95 ≤ 500 ms, errores ≤ 1 %)
+        run: node qa/jmeter/verificar-umbrales.mjs qa/resultados/jmeter/statistics.json 500 1
+
+      - name: Guardar informes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informes-api
+          path: qa/resultados/

@@ -30,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Sin esto el login acepta intentos ilimitados: una contraseña como
      * 'password123' se descubre por fuerza bruta en segundos.
+     *
+     * Los valores salen de config/limites.php; solo las pruebas de carga los cambian.
      */
     private function configurarLimitesDePeticiones(): void
     {
@@ -39,18 +41,18 @@ class AppServiceProvider extends ServiceProvider
             $email = (string) $request->input('email');
 
             return [
-                Limit::perMinute(5)->by('login|'.mb_strtolower($email).'|'.$request->ip()),
-                Limit::perMinute(20)->by('login-ip|'.$request->ip()),
+                Limit::perMinute(config()->integer('limites.login_por_correo'))->by('login|'.mb_strtolower($email).'|'.$request->ip()),
+                Limit::perMinute(config()->integer('limites.login_por_ip'))->by('login-ip|'.$request->ip()),
             ];
         });
 
         // Techo general de la API, para frenar scraping de datos de pacientes.
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config()->integer('limites.api'))
             ->by($request->user()?->id ?: $request->ip()));
 
         // La pantalla de sala de espera es pública: se limita aparte y más fuerte,
         // porque expone nombres de pacientes sin autenticación.
-        RateLimiter::for('publico', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));
+        RateLimiter::for('publico', fn (Request $request) => Limit::perMinute(config()->integer('limites.publico'))->by($request->ip()));
     }
 
     /**
