@@ -18,6 +18,9 @@ vendor/
 dist/
 build/
 
+# Informes de Newman y JMeter (el CI los guarda como artefacto)
+qa/resultados/
+
 # Editores y SO
 .idea/
 .vscode/
