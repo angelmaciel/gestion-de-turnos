@@ -70,7 +70,7 @@ Cada pantalla se actualiza sola por WebSocket: no hay que recargar.
 | Tiempo real | Laravel Reverb (WebSockets) · Redis |
 | Frontend | React 19 · Vite 8 · Tailwind CSS 4 |
 | Infraestructura | Docker Compose · nginx |
-| Calidad | Pest · PHPStan (larastan) · Pint · ESLint |
+| Calidad | Pest · PHPStan (larastan) · Pint · ESLint · Postman/Newman · JMeter |
 
 ## Arquitectura
 
@@ -237,7 +237,7 @@ Detalle completo de las protecciones en [SEGURIDAD.md](SEGURIDAD.md).
 
 ## Verificación
 
-79 tests (Pest) sobre lo que realmente puede fallar en un sistema con datos de
+82 tests (Pest) sobre lo que realmente puede fallar en un sistema con datos de
 salud, no sobre getters y setters:
 
 - **Autorización cruzada** — un profesional de otra especialidad no ve ni
@@ -286,6 +286,13 @@ docker compose exec app ./vendor/bin/phpstan analyse
 cd ../gestion-turnos-front
 npm run build
 ```
+
+Desde afuera, por HTTP y contra la misma imagen de Render, la API se prueba
+además con una colección de **Postman** (41 peticiones, 181 aserciones, corrida
+con Newman) y una prueba de carga con **JMeter** que en el CI exige P95 ≤ 500 ms
+y menos de 1 % de errores con 50 usuarios simultáneos. La carga encontró que
+las altas de turno simultáneas fallaban con 500 por un bloqueo de SQLite; está
+corregido. Detalle, comandos y resultados en [qa/README.md](qa/README.md).
 
 ## Backups
 
